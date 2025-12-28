@@ -1,0 +1,68 @@
+[
+  {
+    "id": "ba72b309-d9b2-463c-9b00-b23cf82fee51",
+    "filename": "ba72b309-d9b2-463c-9b00-b23cf82fee51.png",
+    "filepath": "./db/ba72b309-d9b2-463c-9b00-b23cf82fee51.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 23,
+      "y": 297,
+      "w": 545,
+      "h": 170
+    },
+    "rectScreen": {
+      "x": 35,
+      "y": 445,
+      "w": 818,
+      "h": 255
+    },
+    "meta": {},
+    "timestamp": "2025-12-28T17:28:15.022Z"
+  },
+  {
+    "id": "7affc4ce-fbcb-4caf-95d1-e56428baf0d1",
+    "filename": "7affc4ce-fbcb-4caf-95d1-e56428baf0d1.png",
+    "filepath": "./db/7affc4ce-fbcb-4caf-95d1-e56428baf0d1.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 25,
+      "y": 26,
+      "w": 544,
+      "h": 255
+    },
+    "rectScreen": {
+      "x": 37,
+      "y": 39,
+      "w": 816,
+      "h": 383
+    },
+    "meta": {},
+    "timestamp": "2025-12-28T17:28:15.085Z"
+  },
+  {
+    "id": "b4499a75-5aaa-484b-b8a4-eac838b71fda",
+    "filename": "b4499a75-5aaa-484b-b8a4-eac838b71fda.png",
+    "filepath": "./db/b4499a75-5aaa-484b-b8a4-eac838b71fda.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 1,
+      "y": 2,
+      "w": 581,
+      "h": 245
+    },
+    "rectScreen": {
+      "x": 2,
+      "y": 3,
+      "w": 872,
+      "h": 368
+    },
+    "meta": {},
+    "timestamp": "2025-12-28T17:28:36.258Z"
+  }
+]

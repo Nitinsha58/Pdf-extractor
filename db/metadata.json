@@ -1,200 +1,90 @@
 [
   {
-    "id": "4b5c4a4a-dda4-4e68-8808-450a7f4a9ea4",
-    "filename": "4b5c4a4a-dda4-4e68-8808-450a7f4a9ea4.png",
-    "filepath": "./db/4b5c4a4a-dda4-4e68-8808-450a7f4a9ea4.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 31,
-      "y": 36,
-      "w": 534,
-      "h": 275
-    },
-    "rectScreen": {
-      "x": 47.11111068725586,
-      "y": 54.5555534362793,
-      "w": 801,
-      "h": 413
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:29:24.844Z"
-  },
-  {
-    "id": "afee1d34-4b50-4c7c-a57f-4918c4d242ff",
-    "filename": "afee1d34-4b50-4c7c-a57f-4918c4d242ff.png",
-    "filepath": "./db/afee1d34-4b50-4c7c-a57f-4918c4d242ff.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 37,
-      "y": 338,
-      "w": 521,
-      "h": 211
-    },
-    "rectScreen": {
-      "x": 55.11111068725586,
-      "y": 506.55555725097656,
-      "w": 781,
-      "h": 316
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:29:24.905Z"
-  },
-  {
-    "id": "b8f0e752-8fdc-4bba-b64f-860c7e0f322a",
-    "filename": "b8f0e752-8fdc-4bba-b64f-860c7e0f322a.png",
-    "filepath": "./db/b8f0e752-8fdc-4bba-b64f-860c7e0f322a.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 30,
-      "y": 21,
-      "w": 528,
-      "h": 219
-    },
-    "rectScreen": {
-      "x": 45.11111068725586,
-      "y": 31.555553436279297,
-      "w": 792,
-      "h": 329
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:32:52.537Z"
-  },
-  {
-    "id": "f49b55dc-8d99-4b3d-8534-d2def6264d70",
-    "filename": "f49b55dc-8d99-4b3d-8534-d2def6264d70.png",
-    "filepath": "./db/f49b55dc-8d99-4b3d-8534-d2def6264d70.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 18,
-      "y": 252,
-      "w": 536,
-      "h": 171
-    },
-    "rectScreen": {
-      "x": 27.11111068725586,
-      "y": 378.5555534362793,
-      "w": 804,
-      "h": 256
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:32:52.576Z"
-  },
-  {
-    "id": "5336b92d-b4e2-48e3-89db-94cdfd39ec41",
-    "filename": "5336b92d-b4e2-48e3-89db-94cdfd39ec41.png",
-    "filepath": "./db/5336b92d-b4e2-48e3-89db-94cdfd39ec41.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 25,
-      "y": 34,
-      "w": 543,
-      "h": 275
-    },
-    "rectScreen": {
-      "x": 38,
-      "y": 51,
-      "w": 815,
-      "h": 412
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:35:55.909Z"
-  },
-  {
-    "id": "fa52542f-b748-4b28-bf28-bc23d983b2e0",
-    "filename": "fa52542f-b748-4b28-bf28-bc23d983b2e0.png",
-    "filepath": "./db/fa52542f-b748-4b28-bf28-bc23d983b2e0.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 29,
-      "y": 321,
-      "w": 541,
-      "h": 197
-    },
-    "rectScreen": {
-      "x": 43,
-      "y": 482,
-      "w": 811,
-      "h": 296
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:35:55.968Z"
-  },
-  {
-    "id": "bfe61c51-5065-4cee-864f-9469e1fae967",
-    "filename": "bfe61c51-5065-4cee-864f-9469e1fae967.png",
-    "filepath": "./db/bfe61c51-5065-4cee-864f-9469e1fae967.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 21,
-      "y": 535,
-      "w": 545,
-      "h": 201
-    },
-    "rectScreen": {
-      "x": 32,
-      "y": 802,
-      "w": 818,
-      "h": 302
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:35:56.055Z"
-  },
-  {
-    "id": "d59ce9b6-708b-4c8a-a750-e0609d83178b",
-    "filename": "d59ce9b6-708b-4c8a-a750-e0609d83178b.png",
-    "filepath": "./db/d59ce9b6-708b-4c8a-a750-e0609d83178b.png",
-    "pageNo": 1,
-    "type": "question",
-    "status": "pending",
-    "rectPdf": {
-      "x": 28,
-      "y": 29,
-      "w": 507,
-      "h": 197
-    },
-    "rectScreen": {
-      "x": 42,
-      "y": 44,
-      "w": 761,
-      "h": 296
-    },
-    "meta": {},
-    "timestamp": "2025-12-28T16:42:58.461Z"
-  },
-  {
-    "id": "7d161690-5f55-4799-b063-6d7f0f959a4a",
-    "filename": "7d161690-5f55-4799-b063-6d7f0f959a4a.png",
-    "filepath": "./db/7d161690-5f55-4799-b063-6d7f0f959a4a.png",
+    "id": "5cc39eca-efe5-4d62-8577-67ba741eaec9",
+    "filename": "5cc39eca-efe5-4d62-8577-67ba741eaec9.png",
+    "filepath": "./db/5cc39eca-efe5-4d62-8577-67ba741eaec9.png",
     "pageNo": 1,
     "type": "question",
     "status": "pending",
     "rectPdf": {
       "x": 27,
-      "y": 239,
-      "w": 530,
-      "h": 177
+      "y": 26,
+      "w": 540,
+      "h": 229
     },
     "rectScreen": {
-      "x": 40,
-      "y": 358,
-      "w": 795,
-      "h": 266
+      "x": 41,
+      "y": 39,
+      "w": 810,
+      "h": 344
     },
     "meta": {},
-    "timestamp": "2025-12-28T16:42:58.528Z"
+    "timestamp": "2025-12-28T17:26:43.239Z"
+  },
+  {
+    "id": "6b65992f-6ebf-42d9-a4ff-5e328c223bc0",
+    "filename": "6b65992f-6ebf-42d9-a4ff-5e328c223bc0.png",
+    "filepath": "./db/6b65992f-6ebf-42d9-a4ff-5e328c223bc0.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 30,
+      "y": 262,
+      "w": 534,
+      "h": 225
+    },
+    "rectScreen": {
+      "x": 45,
+      "y": 393,
+      "w": 801,
+      "h": 337
+    },
+    "meta": {},
+    "timestamp": "2025-12-28T17:26:43.303Z"
+  },
+  {
+    "id": "51c2a4e5-4a99-4def-9c25-28be73e06d69",
+    "filename": "51c2a4e5-4a99-4def-9c25-28be73e06d69.png",
+    "filepath": "./db/51c2a4e5-4a99-4def-9c25-28be73e06d69.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 29,
+      "y": 498,
+      "w": 524,
+      "h": 209
+    },
+    "rectScreen": {
+      "x": 44,
+      "y": 747,
+      "w": 786,
+      "h": 313
+    },
+    "meta": {},
+    "timestamp": "2025-12-28T17:26:43.376Z"
+  },
+  {
+    "id": "0ba9f11b-3c41-4ded-802c-2287046e9d71",
+    "filename": "0ba9f11b-3c41-4ded-802c-2287046e9d71.png",
+    "filepath": "./db/0ba9f11b-3c41-4ded-802c-2287046e9d71.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 6,
+      "y": 11,
+      "w": 573,
+      "h": 253
+    },
+    "rectScreen": {
+      "x": 9,
+      "y": 16,
+      "w": 859,
+      "h": 379
+    },
+    "meta": {},
+    "timestamp": "2025-12-28T17:27:06.960Z"
   }
 ]
