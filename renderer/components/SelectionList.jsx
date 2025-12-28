@@ -1,4 +1,4 @@
-export default function SelectionList({ selections, activeId, onSelect }) {
+export default function SelectionList({ deleteSpecificSelection, selections, activeId, onSelect }) {
   return (
     <div style={{
       width: 260,
@@ -30,6 +30,9 @@ export default function SelectionList({ selections, activeId, onSelect }) {
           <div><b>Page:</b> {sel.pageNo}</div>
           <div><b>Type:</b> {sel.type}</div>
           <div><b>Status:</b> {sel.status}</div>
+          <button onClick={() => deleteSpecificSelection(sel.id)}>
+            delete
+          </button>
         </div>
       ))}
     </div>

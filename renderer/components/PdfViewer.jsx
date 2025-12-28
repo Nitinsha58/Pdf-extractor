@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import pdfjsLib from "../pdf/pdfConfig";
-
-export default function PdfViewer({onCropCreate, onPageRender, selections, activeSelection}) {
+import { v4 as uuidv4 } from "uuid";
+export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRender, selections, activeSelection }) {
 
   const canvasRef = useRef(null);
   const overlayRef = useRef(null);
@@ -20,6 +20,152 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
   const viewportRef = useRef(null);
   const pageRef = useRef(null);
 
+
+
+  // Store the folder handles
+  let rootFolderHandle = null;
+  let dbFolderHandle = null;
+
+  const downloadSelectionsToFolder = async () => {
+    if (!selections.length) {
+      alert("No selections to download");
+      return;
+    }
+
+    try {
+      // If no folder selected yet, ask user to pick the root folder
+      if (!rootFolderHandle) {
+        rootFolderHandle = await window.showDirectoryPicker();
+      }
+
+      // Try to verify we still have access
+      try {
+        await rootFolderHandle.requestPermission({ mode: 'readwrite' });
+      } catch (err) {
+        rootFolderHandle = await window.showDirectoryPicker();
+      }
+
+      // Create or get 'db' folder
+      dbFolderHandle = await rootFolderHandle.getDirectoryHandle('db', { create: true });
+
+      // Read existing metadata if it exists
+      let existingMetadata = [];
+      try {
+        const metadataHandle = await dbFolderHandle.getFileHandle('metadata.json');
+        const file = await metadataHandle.getFile();
+        const text = await file.text();
+        existingMetadata = JSON.parse(text);
+      } catch (err) {
+        console.log('No existing metadata.json found in db folder, creating new one');
+      }
+
+      const newMetadata = [];
+
+      for (let i = 0; i < selections.length; i++) {
+        const sel = selections[i];
+
+        // Get the page
+        const page = await pdf.ref.getPage(sel.pageNo);
+
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+
+        // Render full page
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        tempCanvas.width = viewport.width;
+        tempCanvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: tempCtx,
+          viewport: viewport
+        }).promise;
+
+        // Create cropped canvas
+        const croppedCanvas = document.createElement('canvas');
+        const croppedCtx = croppedCanvas.getContext('2d');
+
+        croppedCanvas.width = sel.rectPdf.w * scale;
+        croppedCanvas.height = sel.rectPdf.h * scale;
+
+        croppedCtx.drawImage(
+          tempCanvas,
+          sel.rectPdf.x * scale,
+          sel.rectPdf.y * scale,
+          sel.rectPdf.w * scale,
+          sel.rectPdf.h * scale,
+          0,
+          0,
+          sel.rectPdf.w * scale,
+          sel.rectPdf.h * scale
+        );
+
+        // Convert to blob
+        const blob = await new Promise(resolve =>
+          croppedCanvas.toBlob(resolve, 'image/png')
+        );
+
+        // Use UUID for filename
+        const imageUuid = sel.id || uuidv4();
+        const filename = `${imageUuid}.png`;
+
+        // Write image file to db folder
+        const fileHandle = await dbFolderHandle.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+
+        // Add to new metadata
+        newMetadata.push({
+          id: imageUuid,
+          filename: filename,
+          filepath: `./db/${filename}`,
+          pageNo: sel.pageNo,
+          type: sel.type,
+          status: sel.status,
+          rectPdf: sel.rectPdf,
+          rectScreen: sel.rectScreen,
+          meta: sel.meta,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Concatenate with existing metadata
+      const combinedMetadata = [...existingMetadata, ...newMetadata];
+
+      // Write updated metadata.json to db folder
+      const metadataJson = JSON.stringify(combinedMetadata, null, 2);
+      const metadataBlob = new Blob([metadataJson], { type: 'application/json' });
+
+      const metadataHandle = await dbFolderHandle.getFileHandle('metadata.json', { create: true });
+      const metadataWritable = await metadataHandle.createWritable();
+      await metadataWritable.write(metadataBlob);
+      await metadataWritable.close();
+
+      alert(`✅ Saved ${selections.length} new images to db folder. Total: ${combinedMetadata.length} images`);
+
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('User cancelled folder selection');
+      } else {
+        console.error('Error writing files:', err);
+        alert('Error saving files: ' + err.message);
+      }
+    }
+  };
+
+  // Optional: Change root folder
+  const changeSaveFolder = async () => {
+    try {
+      rootFolderHandle = await window.showDirectoryPicker();
+      dbFolderHandle = null; // Reset db folder handle
+      alert('Save folder updated! A "db" folder will be created on next save.');
+    } catch (err) {
+      console.log('Folder selection cancelled');
+    }
+  };
+
   const openPdf = async () => {
     const [fileHandle] = await window.showOpenFilePicker({
       types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]
@@ -36,12 +182,13 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
     });
 
     setPageNo(1);
+    clearAllSelection();
   };
 
   const startResize = (e, sel, handle) => {
-        e.stopPropagation();
-        setResizing({ sel, handle, startX: e.clientX, startY: e.clientY });
-    };
+    e.stopPropagation();
+    setResizing({ sel, handle, startX: e.clientX, startY: e.clientY });
+  };
 
   const renderPage = async () => {
     if (!pdf) return;
@@ -63,18 +210,18 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
     onPageRender?.({ page, viewport, canvas });
   };
 
-    const onSelect = (selection) => {
-        if (mode === "select") {
-            onCropCreate?.(selection);
-        }
-    };
+  const onSelect = (selection) => {
+    if (mode === "select") {
+      onCropCreate?.(selection);
+    }
+  };
 
-    const onDelete = (selection) => {
-        if (mode === "delete") {
-            const updatedSelections = selections.filter(s => s.id !== selection.id);
-            onCropCreate?.(updatedSelections);
-        }
-    };
+  const onDelete = (selection) => {
+    if (mode === "delete") {
+      const updatedSelections = selections.filter(s => s.id !== selection.id);
+      onCropCreate?.(updatedSelections);
+    }
+  };
 
   useEffect(() => {
     renderPage();
@@ -83,15 +230,15 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
 
   const overlapsExisting = (r) => {
     return selections.some(s =>
-        s.pageNo === pageNo &&
-        !(
+      s.pageNo === pageNo &&
+      !(
         r.x + r.w < s.rectScreen.x ||
         r.x > s.rectScreen.x + s.rectScreen.w ||
         r.y + r.h < s.rectScreen.y ||
         r.y > s.rectScreen.y + s.rectScreen.h
-        )
+      )
     );
-    };
+  };
 
   const handleMouseDown = e => {
     if (!viewportRef.current) return;
@@ -111,15 +258,15 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
   };
 
   const hitTest = (x, y) => {
-      return selections.find(sel =>
-        x >= sel.x &&
-        x <= sel.x + sel.w &&
-        y >= sel.y &&
-        y <= sel.y + sel.h
-      );
-    };
+    return selections.find(sel =>
+      x >= sel.x &&
+      x <= sel.x + sel.w &&
+      y >= sel.y &&
+      y <= sel.y + sel.h
+    );
+  };
 
-    const handleCanvasClick = (e) => {
+  const handleCanvasClick = (e) => {
     if (mode !== "select") return;
 
     const rect = canvasRef.current.getBoundingClientRect();
@@ -137,38 +284,38 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
 
 
 
-    const handleMouseMove = e => {
+  const handleMouseMove = e => {
     const bounds = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - bounds.left;
     const y = e.clientY - bounds.top;
 
     // --- RESIZE MODE ---
     if (resizing) {
-        const { sel, handle } = resizing;
-        const r = { ...sel.rectScreen };
+      const { sel, handle } = resizing;
+      const r = { ...sel.rectScreen };
 
-        if (handle.includes("w")) {
+      if (handle.includes("w")) {
         r.w += r.x - x;
         r.x = x;
-        }
-        if (handle.includes("n")) {
+      }
+      if (handle.includes("n")) {
         r.h += r.y - y;
         r.y = y;
-        }
-        if (handle.includes("e")) {
+      }
+      if (handle.includes("e")) {
         r.w = x - r.x;
-        }
-        if (handle.includes("s")) {
+      }
+      if (handle.includes("s")) {
         r.h = y - r.y;
-        }
+      }
 
-        // Prevent negative flip
-        r.w = Math.max(10, r.w);
-        r.h = Math.max(10, r.h);
+      // Prevent negative flip
+      r.w = Math.max(10, r.w);
+      r.h = Math.max(10, r.h);
 
-        sel.rectScreen = r;
-        onUpdateSelection?.(sel);
-        return;
+      sel.rectScreen = r;
+      onUpdateSelection?.(sel);
+      return;
     }
 
     // --- DRAW MODE ---
@@ -180,26 +327,26 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
     const rh = Math.abs(y - startPos.current.y);
 
     setRect({ x: rx, y: ry, w: rw, h: rh });
-    };
+  };
 
 
   const handleMouseUp = () => {
     if (resizing) {
-        setResizing(null);
-        return;
+      setResizing(null);
+      return;
     }
 
     if (!dragging || !rect) {
-        setDragging(false);
-        return;
+      setDragging(false);
+      return;
     }
 
     setDragging(false);
 
     // ❌ reject overlapping selections
     if (overlapsExisting(rect)) {
-        setRect(null);
-        return;
+      setRect(null);
+      return;
     }
 
     if (!rect || !viewportRef.current) {
@@ -240,168 +387,171 @@ export default function PdfViewer({onCropCreate, onPageRender, selections, activ
   };
 
 
-return (
-  <div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-          <button onClick={openPdf}>Open PDF</button>
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+        <button onClick={openPdf}>Open PDF</button>
 
-          <button disabled={!pdf || pageNo === 1}
-            onClick={() => setPageNo(p => p - 1)}>
-            ◀ Prev
+        <button disabled={!pdf || pageNo === 1}
+          onClick={() => setPageNo(p => p - 1)}>
+          ◀ Prev
+        </button>
+
+        <span>
+          Page {pageNo} / {pdf?.ref?.numPages || "--"}
+        </span>
+
+        <button disabled={!pdf || pageNo === pdf?.ref?.numPages}
+          onClick={() => setPageNo(p => p + 1)}>
+          Next ▶
+        </button>
+
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setMode("draw")}
+            style={{
+              border: mode === "draw" ? "2px solid #007bff" : "1px solid #ccc"
+            }}
+          >
+            Draw
           </button>
 
-          <span>
-            Page {pageNo} / {pdf?.ref?.numPages || "--"}
-          </span>
-
-          <button disabled={!pdf || pageNo === pdf?.ref?.numPages}
-            onClick={() => setPageNo(p => p + 1)}>
-            Next ▶
+          <button
+            onClick={() => setMode("select")}
+            style={{
+              border: mode === "select" ? "2px solid #007bff" : "1px solid #ccc"
+            }}
+          >
+            🖱 Select/Edit
           </button>
 
-            <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                <button 
-                    onClick={() => setMode("draw")}
-                    style={{
-                        border: mode === "draw" ? "2px solid #007bff" : "1px solid #ccc"
-                    }}
-                >
-                    Draw
-                </button>
-
-                <button 
-                    onClick={() => setMode("select")}
-                    style={{
-                        border: mode === "select" ? "2px solid #007bff" : "1px solid #ccc"
-                    }}
-                >
-                    🖱 Select/Edit
-                </button>
-
-                <button 
-                    onClick={() => setMode("delete")}
-                    style={{
-                        border: mode === "delete" ? "2px solid #007bff" : "1px solid #ccc"
-                    }}
-                >
-                    🗑 Delete
-                </button>
-            </div>
-
-          <button onClick={() => setZoom(z => z + 0.25)}>Zoom +</button>
-          <button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}>Zoom -</button>
+          <button
+            onClick={() => setMode("delete")}
+            style={{
+              border: mode === "delete" ? "2px solid #007bff" : "1px solid #ccc"
+            }}
+          >
+            🗑 Delete
+          </button>
+          <button onClick={downloadSelectionsToFolder} disabled={!selections.length}>
+            💾 Download All Selections
+          </button>
         </div>
 
-        {/* PAGE + OVERLAY CONTAINER */}
-    <div
-      style={{
-        position: "relative",
-        display: "inline-block",
-        border: "1px solid #ddd"
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-    >
+        <button onClick={() => setZoom(z => z + 0.25)}>Zoom +</button>
+        <button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}>Zoom -</button>
+      </div>
 
-      {/* The PDF canvas (REQUIRED for getContext) */}
-      <canvas 
-        ref={canvasRef} 
-        onClick={handleCanvasClick}
+      {/* PAGE + OVERLAY CONTAINER */}
+      <div
+        style={{
+          position: "relative",
+          display: "inline-block",
+          border: "1px solid #ddd"
+        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-      />
-
-      {/* Overlay layer for selections */}
-      <div
-        ref={overlayRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "auto"
-        }}
       >
-        {/* Existing saved selections */}
-        {selections
-        .filter(s => s.pageNo === pageNo)
-        .map(s => (
+
+        {/* The PDF canvas (REQUIRED for getContext) */}
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        />
+
+        {/* Overlay layer for selections */}
+        <div
+          ref={overlayRef}
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "auto"
+          }}
+        >
+          {/* Existing saved selections */}
+          {selections
+            .filter(s => s.pageNo === pageNo)
+            .map(s => (
+              <div
+                key={s.id}
+                onClick={() => onSelect(s)}
+                style={{
+                  position: "absolute",
+                  left: s.rectScreen.x,
+                  top: s.rectScreen.y,
+                  width: s.rectScreen.w,
+                  height: s.rectScreen.h,
+                  border:
+                    mode === "delete" && s.id === activeId
+                      ? "3px solid red"
+                      : s.id === activeSelection?.id
+                        ? "3px solid #007bff"
+                        : "2px dashed #00aaff",
+
+                  background: "rgba(0,150,255,0.08)",
+                  cursor: "pointer"
+                }}
+              >
+
+                {/* 🟦 Show resize handles ONLY for active box */}
+                {activeSelection?.id === s.id && (
+                  <>
+                    {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(handle => (
+                      <div
+                        key={handle}
+                        data-handle={handle}
+                        onMouseDown={(e) => startResize(e, s, handle)}
+                        style={{
+                          position: "absolute",
+                          width: 10,
+                          height: 10,
+                          background: "#fff",
+                          border: "2px solid #007bff",
+                          borderRadius: 4,
+                          cursor: `${handle} -resize`,
+
+                          left:
+                            handle.includes("w") ? -5 :
+                              handle.includes("e") ? s.rectScreen.w - 5 :
+                                s.rectScreen.w / 2 - 5,
+
+                          top:
+                            handle.includes("n") ? -5 :
+                              handle.includes("s") ? s.rectScreen.h - 5 :
+                                s.rectScreen.h / 2 - 5
+                        }}
+                      />
+                    ))}
+                  </>
+                )}
+
+              </div>
+            ))}
+
+
+
+          {/* Box currently being drawn */}
+          {rect && (
             <div
-            key={s.id}
-            onClick={() => onSelect(s)}
-            style={{
+              style={{
                 position: "absolute",
-                left: s.rectScreen.x,
-                top: s.rectScreen.y,
-                width: s.rectScreen.w,
-                height: s.rectScreen.h,
-                border: 
-                  mode === "delete" && s.id === activeId
-                    ? "3px solid red"
-                    : s.id === activeSelection?.id
-                    ? "3px solid #007bff"
-                    : "2px dashed #00aaff",
-
-                background: "rgba(0,150,255,0.08)",
-                cursor: "pointer"
-            }}
-            >
-
-            {/* 🟦 Show resize handles ONLY for active box */}
-            {activeSelection?.id === s.id && (
-                <>
-                {["nw","n","ne","e","se","s","sw","w"].map(handle => (
-                    <div
-                    key={handle}
-                    data-handle={handle}
-                    onMouseDown={(e) => startResize(e, s, handle)}
-                    style={{
-                        position: "absolute",
-                        width: 10,
-                        height: 10,
-                        background: "#fff",
-                        border: "2px solid #007bff",
-                        borderRadius: 4,
-                        cursor: `${handle}-resize`,
-
-                        left:
-                        handle.includes("w") ? -5 :
-                        handle.includes("e") ? s.rectScreen.w - 5 :
-                        s.rectScreen.w / 2 - 5,
-
-                        top:
-                        handle.includes("n") ? -5 :
-                        handle.includes("s") ? s.rectScreen.h - 5 :
-                        s.rectScreen.h / 2 - 5
-                    }}
-                    />
-                ))}
-                </>
-            )}
-
-            </div>
-        ))}
-
-
-
-        {/* Box currently being drawn */}
-        {rect && (
-          <div
-            style={{
-              position: "absolute",
-              left: rect.x,
-              top: rect.y,
-              width: rect.w,
-              height: rect.h,
-              border: "2px solid #00aaff",
-              background: "rgba(0,150,255,0.15)"
-            }}
-          />
-        )}
+                left: rect.x,
+                top: rect.y,
+                width: rect.w,
+                height: rect.h,
+                border: "2px solid #00aaff",
+                background: "rgba(0,150,255,0.15)"
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
 }
 

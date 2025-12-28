@@ -8,6 +8,14 @@ export default function App() {
   const [activeId, setActiveId] = useState(null);
 
   const activeSelection = selections.find(s => s.id === activeId);
+  const clearAllSelection = () => {
+    setSelections([])
+  };
+
+  const deleteSpecificSelection = id => {
+    setSelections(prev => prev.filter(sel => sel.id !== id));
+    setActiveId(null);
+  };
 
   const handleCreateSelection = sel => {
     const id = uuidv4();
@@ -36,11 +44,13 @@ export default function App() {
 
       <PdfViewer
         onCropCreate={handleCreateSelection}
+        clearAllSelection={clearAllSelection}
         selections={selections}
         activeSelection={activeSelection}
       />
 
       <SelectionList
+        deleteSpecificSelection={deleteSpecificSelection}
         selections={selections}
         activeId={activeId}
         onSelect={handleSelect}
