@@ -28,6 +28,13 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
   const [selectedChapter, setSelectedChapter] = useState('');
   const [selectedConcept, setSelectedConcept] = useState('');
 
+  // Additional attributes
+  const [questionType, setQuestionType] = useState('MCQ');
+  const [difficulty, setDifficulty] = useState('easy');
+  const [marks, setMarks] = useState(1);
+  const [usage, setUsage] = useState('HW');
+  const [priority, setPriority] = useState(0);
+
   // crop state
   const [dragging, setDragging] = useState(false);
   const [rect, setRect] = useState(null);
@@ -35,9 +42,8 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
   const viewportRef = useRef(null);
   const pageRef = useRef(null);
 
-  // Store the folder handles
-  let rootFolderHandle = null;
-  let dbFolderHandle = null;
+  // Store the folder handle
+  let dbFolderHandle = useRef(null);
 
   // Load relation data
   useEffect(() => {
@@ -90,30 +96,27 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
     setShowModal(false);
 
     try {
-      // If no folder selected yet, ask user to pick the root folder
-      if (!rootFolderHandle) {
-        rootFolderHandle = await window.showDirectoryPicker();
+      // If no folder selected yet, ask user to pick the db folder directly
+      if (!dbFolderHandle.current) {
+        dbFolderHandle.current = await window.showDirectoryPicker();
       }
 
       // Try to verify we still have access
       try {
-        await rootFolderHandle.requestPermission({ mode: 'readwrite' });
+        await dbFolderHandle.current.requestPermission({ mode: 'readwrite' });
       } catch (err) {
-        rootFolderHandle = await window.showDirectoryPicker();
+        dbFolderHandle.current = await window.showDirectoryPicker();
       }
 
-      // Create or get 'db' folder
-      dbFolderHandle = await rootFolderHandle.getDirectoryHandle('db', { create: true });
-
-      // Read existing metadata if it exists
+      // Read existing metadata from localStorage
       let existingMetadata = [];
       try {
-        const metadataHandle = await dbFolderHandle.getFileHandle('metadata.json');
-        const file = await metadataHandle.getFile();
-        const text = await file.text();
-        existingMetadata = JSON.parse(text);
+        const storedMetadata = localStorage.getItem('imageMetadata');
+        if (storedMetadata) {
+          existingMetadata = JSON.parse(storedMetadata);
+        }
       } catch (err) {
-        console.log('No existing metadata.json found in db folder, creating new one');
+        console.log('No existing metadata found in localStorage, creating new one');
       }
 
       const newMetadata = [];
@@ -168,7 +171,7 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         const filename = `${imageUuid}.png`;
 
         // Write image file to db folder
-        const fileHandle = await dbFolderHandle.getFileHandle(filename, { create: true });
+        const fileHandle = await dbFolderHandle.current.getFileHandle(filename, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(blob);
         await writable.close();
@@ -177,7 +180,7 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         newMetadata.push({
           id: imageUuid,
           filename: filename,
-          filepath: `./db/${filename}`,
+          filepath: `./${filename}`,
           pageNo: sel.pageNo,
           type: sel.type,
           status: sel.status,
@@ -187,6 +190,13 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
           subjectId: selectedSubject,
           chapterId: selectedChapter,
           conceptId: selectedConcept,
+          questionType: questionType,
+          difficulty: difficulty,
+          marks: marks,
+          usage: usage,
+          priority: priority,
+          verified: false,
+          active: true,
           meta: sel.meta,
           timestamp: new Date().toISOString()
         });
@@ -195,22 +205,21 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
       // Concatenate with existing metadata
       const combinedMetadata = [...existingMetadata, ...newMetadata];
 
-      // Write updated metadata.json to db folder
-      const metadataJson = JSON.stringify(combinedMetadata, null, 2);
-      const metadataBlob = new Blob([metadataJson], { type: 'application/json' });
+      // Save updated metadata to localStorage
+      localStorage.setItem('imageMetadata', JSON.stringify(combinedMetadata));
 
-      const metadataHandle = await dbFolderHandle.getFileHandle('metadata.json', { create: true });
-      const metadataWritable = await metadataHandle.createWritable();
-      await metadataWritable.write(metadataBlob);
-      await metadataWritable.close();
-
-      alert(`✅ Saved ${selections.length} new images to db folder. Total: ${combinedMetadata.length} images`);
+      alert(`✅ Saved ${selections.length} new images to folder. Total: ${combinedMetadata.length} images. Metadata saved to localStorage.`);
 
       // Reset selections
       setSelectedClass('');
       setSelectedSubject('');
       setSelectedChapter('');
       setSelectedConcept('');
+      setQuestionType('MCQ');
+      setDifficulty('easy');
+      setMarks(1);
+      setUsage('HW');
+      setPriority(0);
 
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -558,6 +567,75 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
                   <option key={concept.id} value={concept.id}>{concept.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Question Type:</label>
+              <select
+                value={questionType}
+                onChange={(e) => setQuestionType(e.target.value)}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="MCQ">MCQ</option>
+                <option value="numerical">Numerical</option>
+                <option value="theory">Theory</option>
+                <option value="CASE">CASE</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Difficulty:</label>
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Marks:</label>
+              <input
+                type="number"
+                min="1"
+                value={marks}
+                onChange={(e) => setMarks(parseInt(e.target.value) || 1)}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Usage:</label>
+              <select
+                value={usage}
+                onChange={(e) => setUsage(e.target.value)}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="HW">HW</option>
+                <option value="CW">CW</option>
+                <option value="exercise">Exercise</option>
+                <option value="test">Test</option>
+                <option value="compact">Compact</option>
+                <option value="smart">Smart</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Priority (0-5):</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                value={priority}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setPriority(Math.min(5, Math.max(0, val)));
+                }}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              />
             </div>
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

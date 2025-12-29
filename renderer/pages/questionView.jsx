@@ -1,6 +1,328 @@
 import { useState, useEffect, useMemo } from 'react';
-import metadataJson from '../db/metadata.json';
 
+function QuestionCard({ item, classes, subjects, chapters, concepts, onUpdate, onDelete }) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState(item);
+
+    const getRelatedData = () => {
+        const concept = concepts.find(c => c.id === item.conceptId);
+        const chapter = chapters.find(ch => ch.id === item.chapterId);
+        const subject = subjects.find(s => s.id === item.subjectId);
+        const classData = classes.find(cl => cl.id === item.classId);
+        return { concept, chapter, subject, classData };
+    };
+
+    const { concept, chapter, subject, classData } = getRelatedData();
+
+    const handleSave = () => {
+        onUpdate(editData);
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setEditData(item);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-4">
+                    <h3 className="text-lg font-bold mb-4">Edit Question</h3>
+
+                    <div className="space-y-3">
+                        <img
+                            src={item.filepath}
+                            alt="Question"
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
+                            }}
+                        />
+                        {/* Class */}
+                        <div>
+
+                            <label className="block text-xs font-medium mb-1">Class</label>
+                            <select
+                                value={editData.classId}
+                                onChange={(e) => setEditData({ ...editData, classId: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="">Select Class</option>
+                                {classes.map(cls => (
+                                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Subject */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Subject</label>
+                            <select
+                                value={editData.subjectId}
+                                onChange={(e) => setEditData({ ...editData, subjectId: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="">Select Subject</option>
+                                {subjects.map(subj => (
+                                    <option key={subj.id} value={subj.id}>{subj.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Chapter */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Chapter</label>
+                            <select
+                                value={editData.chapterId}
+                                onChange={(e) => setEditData({ ...editData, chapterId: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="">Select Chapter</option>
+                                {chapters.map(chap => (
+                                    <option key={chap.id} value={chap.id}>{chap.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Concept */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Concept</label>
+                            <select
+                                value={editData.conceptId}
+                                onChange={(e) => setEditData({ ...editData, conceptId: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="">Select Concept</option>
+                                {concepts.map(conc => (
+                                    <option key={conc.id} value={conc.id}>{conc.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Question Type */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Question Type</label>
+                            <select
+                                value={editData.questionType}
+                                onChange={(e) => setEditData({ ...editData, questionType: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="MCQ">MCQ</option>
+                                <option value="numerical">Numerical</option>
+                                <option value="theory">Theory</option>
+                                <option value="CASE">CASE</option>
+                            </select>
+                        </div>
+
+                        {/* Difficulty */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Difficulty</label>
+                            <select
+                                value={editData.difficulty}
+                                onChange={(e) => setEditData({ ...editData, difficulty: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="easy">Easy</option>
+                                <option value="medium">Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
+
+                        {/* Marks */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Marks</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={editData.marks}
+                                onChange={(e) => setEditData({ ...editData, marks: parseInt(e.target.value) || 1 })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            />
+                        </div>
+
+                        {/* Usage */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Usage</label>
+                            <select
+                                value={editData.usage}
+                                onChange={(e) => setEditData({ ...editData, usage: e.target.value })}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                                <option value="HW">HW</option>
+                                <option value="CW">CW</option>
+                                <option value="exercise">Exercise</option>
+                                <option value="test">Test</option>
+                                <option value="compact">Compact</option>
+                                <option value="smart">Smart</option>
+                            </select>
+                        </div>
+
+                        {/* Priority */}
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Priority (0-5)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                max="5"
+                                value={editData.priority}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    setEditData({ ...editData, priority: Math.min(5, Math.max(0, val)) });
+                                }}
+                                className="w-full px-2 py-1 text-sm border rounded"
+                            />
+                        </div>
+
+                        {/* Checkboxes */}
+                        <div className="flex gap-4">
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={editData.verified}
+                                    onChange={(e) => setEditData({ ...editData, verified: e.target.checked })}
+                                    className="mr-2"
+                                />
+                                <label className="text-xs font-medium">Verified</label>
+                            </div>
+                            <div className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={editData.active}
+                                    onChange={(e) => setEditData({ ...editData, active: e.target.checked })}
+                                    className="mr-2"
+                                />
+                                <label className="text-xs font-medium">Active</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 mt-4">
+                        <button
+                            onClick={handleCancel}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 transition text-sm"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
+            {/* Image */}
+            <div className="relative bg-gray-100 h-48">
+                <img
+                    src={item.filepath}
+                    alt="Question"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
+                    }}
+                />
+                <div className="absolute top-2 right-2 flex gap-2">
+                    {item.verified && (
+                        <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800">
+                            ✓ Verified
+                        </span>
+                    )}
+                    {!item.active && (
+                        <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
+                            Inactive
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+                {/* Hierarchy Info */}
+                <div className="mb-3 pb-3 border-b border-gray-200">
+                    <div className="text-xs text-gray-600 space-y-1">
+                        {classData && (
+                            <div className="flex items-center gap-1">
+                                <span className="font-semibold">📚</span>
+                                <span>{classData.name}</span>
+                                {subject && <span className="text-gray-400">•</span>}
+                                {subject && <span>{subject.name}</span>}
+                            </div>
+                        )}
+                        {chapter && (
+                            <div className="flex items-center gap-1">
+                                <span className="font-semibold">📖</span>
+                                <span className="truncate">{chapter.name}</span>
+                            </div>
+                        )}
+                        {concept && (
+                            <div className="flex items-center gap-1">
+                                <span className="font-semibold">💡</span>
+                                <span className="truncate">{concept.name}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Question Details */}
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-700">Type:</span>
+                        <span className="font-semibold text-blue-600">{item.questionType}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-700">Difficulty:</span>
+                        <span className={`font-semibold ${item.difficulty === 'easy' ? 'text-green-600' :
+                            item.difficulty === 'medium' ? 'text-yellow-600' :
+                                'text-red-600'
+                            }`}>{item.difficulty}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-700">Marks:</span>
+                        <span className="font-semibold">{item.marks}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-700">Usage:</span>
+                        <span className="font-semibold">{item.usage}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-700">Priority:</span>
+                        <span className="font-semibold">{item.priority}/5</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-medium text-gray-700">Page:</span>
+                        <span>{item.pageNo}</span>
+                    </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mt-4">
+                    <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm font-medium"
+                    >
+                        ✏️ Edit
+                    </button>
+                    <button
+                        onClick={() => onDelete(item.id)}
+                        className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm font-medium"
+                    >
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Main QuestionView Component
 export default function QuestionView() {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,16 +340,21 @@ export default function QuestionView() {
         subjectId: '',
         chapterId: '',
         conceptId: '',
-        type: '',
-        status: '',
+        questionType: '',
+        difficulty: '',
+        usage: '',
         searchText: ''
     });
 
-    // Load relation data
+    // Load data from localStorage
     useEffect(() => {
-        const fetchRelationData = async () => {
+        try {
+            // Load metadata
+            const storedMetadata = localStorage.getItem('imageMetadata');
+            const metadata = storedMetadata ? JSON.parse(storedMetadata) : [];
+            setData(metadata);
 
-
+            // Load relation data
             const savedClasses = localStorage.getItem('classes');
             setClasses(savedClasses ? JSON.parse(savedClasses) : []);
 
@@ -39,14 +366,7 @@ export default function QuestionView() {
 
             const savedConcepts = localStorage.getItem('concept');
             setConcepts(savedConcepts ? JSON.parse(savedConcepts) : []);
-            console.log(classes, chapters, subjects, concepts);
-        };
-        fetchRelationData();
-    }, []);
 
-    useEffect(() => {
-        try {
-            setData(metadataJson);
             setLoading(false);
         } catch (err) {
             setError(err.message);
@@ -54,34 +374,26 @@ export default function QuestionView() {
         }
     }, []);
 
-    // Helper function to get related data
-    const getRelatedData = (item) => {
-        const concept = concepts.find(c => c.id === item.conceptId);
-        const chapter = concept ? chapters.find(ch => ch.id === concept.chapterId) : null;
-        const subject = chapter ? subjects.find(s => s.id === chapter.subjectId) : null;
-        const classData = chapter ? classes.find(cl => cl.id === chapter.classId) : null;
-
-        return { concept, chapter, subject, classData };
-    };
-
     // Filter data based on active filters
     const filteredData = useMemo(() => {
         return data.filter(item => {
-            const { concept, chapter } = getRelatedData(item);
-
             // Filter by hierarchy
-            if (filters.classId && chapter?.classId !== filters.classId) return false;
-            if (filters.subjectId && chapter?.subjectId !== filters.subjectId) return false;
-            if (filters.chapterId && concept?.chapterId !== filters.chapterId) return false;
+            if (filters.classId && item.classId !== filters.classId) return false;
+            if (filters.subjectId && item.subjectId !== filters.subjectId) return false;
+            if (filters.chapterId && item.chapterId !== filters.chapterId) return false;
             if (filters.conceptId && item.conceptId !== filters.conceptId) return false;
 
-            // Filter by type and status
-            if (filters.type && item.type !== filters.type) return false;
-            if (filters.status && item.status !== filters.status) return false;
+            // Filter by new attributes
+            if (filters.questionType && item.questionType !== filters.questionType) return false;
+            if (filters.difficulty && item.difficulty !== filters.difficulty) return false;
+            if (filters.usage && item.usage !== filters.usage) return false;
 
             // Search text filter
             if (filters.searchText) {
                 const searchLower = filters.searchText.toLowerCase();
+                const concept = concepts.find(c => c.id === item.conceptId);
+                const chapter = chapters.find(ch => ch.id === item.chapterId);
+
                 const matchesId = item.id.toLowerCase().includes(searchLower);
                 const matchesPage = item.pageNo.toString().includes(searchLower);
                 const matchesConcept = concept?.name.toLowerCase().includes(searchLower);
@@ -94,34 +406,13 @@ export default function QuestionView() {
 
             return true;
         });
-    }, [data, filters, concepts, chapters, subjects, classes]);
+    }, [data, filters, concepts, chapters]);
 
     // Get unique values for filter dropdowns
     const getUniqueValues = (field) => {
         const values = new Set();
         data.forEach(item => {
-            const { concept, chapter } = getRelatedData(item);
-
-            switch (field) {
-                case 'classId':
-                    if (chapter?.classId) values.add(chapter.classId);
-                    break;
-                case 'subjectId':
-                    if (chapter?.subjectId) values.add(chapter.subjectId);
-                    break;
-                case 'chapterId':
-                    if (concept?.chapterId) values.add(concept.chapterId);
-                    break;
-                case 'conceptId':
-                    if (item.conceptId) values.add(item.conceptId);
-                    break;
-                case 'type':
-                    if (item.type) values.add(item.type);
-                    break;
-                case 'status':
-                    if (item.status) values.add(item.status);
-                    break;
-            }
+            if (item[field]) values.add(item[field]);
         });
         return Array.from(values);
     };
@@ -132,13 +423,30 @@ export default function QuestionView() {
             subjectId: '',
             chapterId: '',
             conceptId: '',
-            type: '',
-            status: '',
+            questionType: '',
+            difficulty: '',
+            usage: '',
             searchText: ''
         });
     };
 
     const hasActiveFilters = Object.values(filters).some(v => v !== '');
+
+    const handleUpdate = (updatedItem) => {
+        const updatedData = data.map(item =>
+            item.id === updatedItem.id ? updatedItem : item
+        );
+        setData(updatedData);
+        localStorage.setItem('imageMetadata', JSON.stringify(updatedData));
+    };
+
+    const handleDelete = (itemId) => {
+        if (!confirm('Are you sure you want to delete this question?')) return;
+
+        const updatedData = data.filter(item => item.id !== itemId);
+        setData(updatedData);
+        localStorage.setItem('imageMetadata', JSON.stringify(updatedData));
+    };
 
     if (loading) {
         return (
@@ -198,9 +506,7 @@ export default function QuestionView() {
 
                         {/* Class Filter */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Class
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
                             <select
                                 value={filters.classId}
                                 onChange={(e) => setFilters(prev => ({ ...prev, classId: e.target.value }))}
@@ -216,9 +522,7 @@ export default function QuestionView() {
 
                         {/* Subject Filter */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Subject
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                             <select
                                 value={filters.subjectId}
                                 onChange={(e) => setFilters(prev => ({ ...prev, subjectId: e.target.value }))}
@@ -234,9 +538,7 @@ export default function QuestionView() {
 
                         {/* Chapter Filter */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Chapter
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Chapter</label>
                             <select
                                 value={filters.chapterId}
                                 onChange={(e) => setFilters(prev => ({ ...prev, chapterId: e.target.value }))}
@@ -252,9 +554,7 @@ export default function QuestionView() {
 
                         {/* Concept Filter */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Concept
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Concept</label>
                             <select
                                 value={filters.conceptId}
                                 onChange={(e) => setFilters(prev => ({ ...prev, conceptId: e.target.value }))}
@@ -268,36 +568,47 @@ export default function QuestionView() {
                             </select>
                         </div>
 
-                        {/* Type Filter */}
+                        {/* Question Type Filter */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Type
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Question Type</label>
                             <select
-                                value={filters.type}
-                                onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                                value={filters.questionType}
+                                onChange={(e) => setFilters(prev => ({ ...prev, questionType: e.target.value }))}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                                 <option value="">All Types</option>
-                                {getUniqueValues('type').map(type => (
+                                {getUniqueValues('questionType').map(type => (
                                     <option key={type} value={type}>{type}</option>
                                 ))}
                             </select>
                         </div>
 
-                        {/* Status Filter */}
+                        {/* Difficulty Filter */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Status
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
                             <select
-                                value={filters.status}
-                                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                                value={filters.difficulty}
+                                onChange={(e) => setFilters(prev => ({ ...prev, difficulty: e.target.value }))}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                                <option value="">All Statuses</option>
-                                {getUniqueValues('status').map(status => (
-                                    <option key={status} value={status}>{status}</option>
+                                <option value="">All Difficulties</option>
+                                {getUniqueValues('difficulty').map(diff => (
+                                    <option key={diff} value={diff}>{diff}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Usage Filter */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Usage</label>
+                            <select
+                                value={filters.usage}
+                                onChange={(e) => setFilters(prev => ({ ...prev, usage: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                                <option value="">All Usage</option>
+                                {getUniqueValues('usage').map(usage => (
+                                    <option key={usage} value={usage}>{usage}</option>
                                 ))}
                             </select>
                         </div>
@@ -316,93 +627,18 @@ export default function QuestionView() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredData.map((item, index) => {
-                            const { concept, chapter, subject, classData } = getRelatedData(item);
-
-                            return (
-                                <div
-                                    key={item.id}
-                                    className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition"
-                                >
-                                    {/* Image */}
-                                    <div className="relative bg-gray-100 h-48">
-                                        <img
-                                            src={item.filepath.replace('./', '../')}
-                                            alt={`Question ${index + 1}`}
-                                            className="w-full h-full object-contain"
-                                            onError={(e) => {
-                                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                            }}
-                                        />
-                                        <div className="absolute top-2 right-2">
-                                            <span
-                                                className={`px-2 py-1 text-xs font-semibold rounded ${item.status === 'pending'
-                                                    ? 'bg-yellow-100 text-yellow-800'
-                                                    : 'bg-green-100 text-green-800'
-                                                    }`}
-                                            >
-                                                {item.status}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Content */}
-                                    <div className="p-4">
-                                        {/* Hierarchy Info */}
-                                        <div className="mb-3 pb-3 border-b border-gray-200">
-                                            <div className="text-xs text-gray-600 space-y-1">
-                                                {classData && (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="font-semibold">📚</span>
-                                                        <span>{classData.name}</span>
-                                                        {subject && <span className="text-gray-400">•</span>}
-                                                        {subject && <span>{subject.name}</span>}
-                                                    </div>
-                                                )}
-                                                {chapter && (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="font-semibold">📖</span>
-                                                        <span className="truncate">{chapter.name}</span>
-                                                    </div>
-                                                )}
-                                                {concept && (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="font-semibold">💡</span>
-                                                        <span className="truncate">{concept.name}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Question Details */}
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium text-gray-900">
-                                                Question #{data.indexOf(item) + 1}
-                                            </span>
-                                            <span className="text-sm text-gray-500">
-                                                Page {item.pageNo}
-                                            </span>
-                                        </div>
-
-                                        <div className="space-y-1 text-sm text-gray-600">
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">ID:</span>
-                                                <span className="text-xs text-gray-500 truncate ml-2">
-                                                    {item.id.slice(0, 8)}...
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">Type:</span>
-                                                <span className="font-semibold text-blue-600">{item.type}</span>
-                                            </div>
-                                            <div className="text-xs text-gray-400 mt-2">
-                                                {new Date(item.timestamp).toLocaleString()}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {filteredData.map((item) => (
+                            <QuestionCard
+                                key={item.id}
+                                item={item}
+                                classes={classes}
+                                subjects={subjects}
+                                chapters={chapters}
+                                concepts={concepts}
+                                onUpdate={handleUpdate}
+                                onDelete={handleDelete}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
