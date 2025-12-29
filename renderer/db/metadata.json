@@ -1,68 +1,236 @@
 [
   {
-    "id": "ba72b309-d9b2-463c-9b00-b23cf82fee51",
-    "filename": "ba72b309-d9b2-463c-9b00-b23cf82fee51.png",
-    "filepath": "./db/ba72b309-d9b2-463c-9b00-b23cf82fee51.png",
+    "id": "f2bd4e61-862c-459a-81e3-c3cb504a9b91",
+    "filename": "f2bd4e61-862c-459a-81e3-c3cb504a9b91.png",
+    "filepath": "./db/f2bd4e61-862c-459a-81e3-c3cb504a9b91.png",
     "pageNo": 1,
     "type": "question",
     "status": "pending",
     "rectPdf": {
       "x": 23,
-      "y": 297,
-      "w": 545,
-      "h": 170
+      "y": 32,
+      "w": 567,
+      "h": 167
     },
     "rectScreen": {
       "x": 35,
-      "y": 445,
-      "w": 818,
-      "h": 255
+      "y": 48,
+      "w": 851,
+      "h": 250
     },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
     "meta": {},
-    "timestamp": "2025-12-28T17:28:15.022Z"
+    "timestamp": "2025-12-29T09:18:09.302Z"
   },
   {
-    "id": "7affc4ce-fbcb-4caf-95d1-e56428baf0d1",
-    "filename": "7affc4ce-fbcb-4caf-95d1-e56428baf0d1.png",
-    "filepath": "./db/7affc4ce-fbcb-4caf-95d1-e56428baf0d1.png",
+    "id": "b114559b-4f03-4bed-999c-564ed234bb75",
+    "filename": "b114559b-4f03-4bed-999c-564ed234bb75.png",
+    "filepath": "./db/b114559b-4f03-4bed-999c-564ed234bb75.png",
     "pageNo": 1,
     "type": "question",
     "status": "pending",
     "rectPdf": {
-      "x": 25,
-      "y": 26,
-      "w": 544,
-      "h": 255
+      "x": 21,
+      "y": 209,
+      "w": 568,
+      "h": 136
     },
     "rectScreen": {
-      "x": 37,
-      "y": 39,
-      "w": 816,
-      "h": 383
+      "x": 32,
+      "y": 313,
+      "w": 852,
+      "h": 204
     },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
     "meta": {},
-    "timestamp": "2025-12-28T17:28:15.085Z"
+    "timestamp": "2025-12-29T09:18:09.364Z"
   },
   {
-    "id": "b4499a75-5aaa-484b-b8a4-eac838b71fda",
-    "filename": "b4499a75-5aaa-484b-b8a4-eac838b71fda.png",
-    "filepath": "./db/b4499a75-5aaa-484b-b8a4-eac838b71fda.png",
+    "id": "d17253db-f8aa-4378-909f-de74694367c1",
+    "filename": "d17253db-f8aa-4378-909f-de74694367c1.png",
+    "filepath": "./db/d17253db-f8aa-4378-909f-de74694367c1.png",
     "pageNo": 1,
     "type": "question",
     "status": "pending",
     "rectPdf": {
-      "x": 1,
-      "y": 2,
-      "w": 581,
-      "h": 245
+      "x": 23,
+      "y": 355,
+      "w": 565,
+      "h": 129
     },
     "rectScreen": {
-      "x": 2,
-      "y": 3,
-      "w": 872,
-      "h": 368
+      "x": 35,
+      "y": 532,
+      "w": 848,
+      "h": 194
     },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
     "meta": {},
-    "timestamp": "2025-12-28T17:28:36.258Z"
+    "timestamp": "2025-12-29T09:18:09.402Z"
+  },
+  {
+    "id": "edfb6a89-ee8e-485c-9d3b-3a737de93def",
+    "filename": "edfb6a89-ee8e-485c-9d3b-3a737de93def.png",
+    "filepath": "./db/edfb6a89-ee8e-485c-9d3b-3a737de93def.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 21,
+      "y": 495,
+      "w": 575,
+      "h": 143
+    },
+    "rectScreen": {
+      "x": 32,
+      "y": 743,
+      "w": 863,
+      "h": 215
+    },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
+    "meta": {},
+    "timestamp": "2025-12-29T09:18:09.443Z"
+  },
+  {
+    "id": "d8abf533-2e10-4ace-ad24-ab064993091a",
+    "filename": "d8abf533-2e10-4ace-ad24-ab064993091a.png",
+    "filepath": "./db/d8abf533-2e10-4ace-ad24-ab064993091a.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 28,
+      "y": 31,
+      "w": 538,
+      "h": 197
+    },
+    "rectScreen": {
+      "x": 42,
+      "y": 47,
+      "w": 807,
+      "h": 295
+    },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
+    "meta": {},
+    "timestamp": "2025-12-29T09:38:55.679Z"
+  },
+  {
+    "id": "5376ce77-0e5b-467a-aeb8-f1827a7c0595",
+    "filename": "5376ce77-0e5b-467a-aeb8-f1827a7c0595.png",
+    "filepath": "./db/5376ce77-0e5b-467a-aeb8-f1827a7c0595.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 32,
+      "y": 236,
+      "w": 525,
+      "h": 181
+    },
+    "rectScreen": {
+      "x": 48,
+      "y": 354,
+      "w": 787,
+      "h": 271
+    },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
+    "meta": {},
+    "timestamp": "2025-12-29T09:38:55.725Z"
+  },
+  {
+    "id": "00858627-c571-4a97-b6fa-9194af6b8798",
+    "filename": "00858627-c571-4a97-b6fa-9194af6b8798.png",
+    "filepath": "./db/00858627-c571-4a97-b6fa-9194af6b8798.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 31,
+      "y": 429,
+      "w": 531,
+      "h": 198
+    },
+    "rectScreen": {
+      "x": 46,
+      "y": 644,
+      "w": 796,
+      "h": 297
+    },
+    "classId": "1766997109048",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997330119",
+    "conceptId": "1766997610268",
+    "meta": {},
+    "timestamp": "2025-12-29T09:38:55.794Z"
+  },
+  {
+    "id": "e8bb97a9-9587-46c3-88ae-61c3b154a1ed",
+    "filename": "e8bb97a9-9587-46c3-88ae-61c3b154a1ed.png",
+    "filepath": "./db/e8bb97a9-9587-46c3-88ae-61c3b154a1ed.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 9,
+      "y": 10,
+      "w": 568,
+      "h": 244
+    },
+    "rectScreen": {
+      "x": 14,
+      "y": 15,
+      "w": 852,
+      "h": 366
+    },
+    "classId": "1766997111080",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997540539",
+    "conceptId": "1766997621107",
+    "meta": {},
+    "timestamp": "2025-12-29T09:42:04.805Z"
+  },
+  {
+    "id": "0dcd4d6d-1733-4ce5-a2f3-a2fa0f983801",
+    "filename": "0dcd4d6d-1733-4ce5-a2f3-a2fa0f983801.png",
+    "filepath": "./db/0dcd4d6d-1733-4ce5-a2f3-a2fa0f983801.png",
+    "pageNo": 1,
+    "type": "question",
+    "status": "pending",
+    "rectPdf": {
+      "x": 7,
+      "y": 263,
+      "w": 569,
+      "h": 173
+    },
+    "rectScreen": {
+      "x": 11,
+      "y": 394,
+      "w": 853,
+      "h": 260
+    },
+    "classId": "1766997111080",
+    "subjectId": "1766997190782",
+    "chapterId": "1766997540539",
+    "conceptId": "1766997621107",
+    "meta": {},
+    "timestamp": "2025-12-29T09:42:04.866Z"
   }
 ]

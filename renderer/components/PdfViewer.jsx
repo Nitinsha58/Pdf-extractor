@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import pdfjsLib from "../pdf/pdfConfig";
 import { v4 as uuidv4 } from "uuid";
+import { loadData } from "../data";
+
 export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRender, selections, activeSelection }) {
 
   const canvasRef = useRef(null);
@@ -13,6 +15,19 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
   const [activeId, setActiveId] = useState(null);
   const [resizing, setResizing] = useState(null);
 
+  // Relation data
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [concepts, setConcepts] = useState([]);
+
+  // Selection modal
+  const [showModal, setShowModal] = useState(false);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedChapter, setSelectedChapter] = useState('');
+  const [selectedConcept, setSelectedConcept] = useState('');
+
   // crop state
   const [dragging, setDragging] = useState(false);
   const [rect, setRect] = useState(null);
@@ -20,17 +35,59 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
   const viewportRef = useRef(null);
   const pageRef = useRef(null);
 
-
-
   // Store the folder handles
   let rootFolderHandle = null;
   let dbFolderHandle = null;
+
+  // Load relation data
+  useEffect(() => {
+    const fetchRelationData = async () => {
+      const result = await loadData();
+
+      const savedClasses = localStorage.getItem('classes');
+      setClasses(savedClasses ? JSON.parse(savedClasses) : result.classes);
+
+      const savedSubjects = localStorage.getItem('subject');
+      setSubjects(savedSubjects ? JSON.parse(savedSubjects) : result.subject);
+
+      const savedChapters = localStorage.getItem('chapter');
+      setChapters(savedChapters ? JSON.parse(savedChapters) : result.chapter);
+
+      const savedConcepts = localStorage.getItem('concept');
+      setConcepts(savedConcepts ? JSON.parse(savedConcepts) : result.concept);
+    };
+    fetchRelationData();
+  }, []);
+
+  // Filter chapters by selected class and subject
+  const filteredChapters = chapters.filter(chapter => {
+    const matchClass = !selectedClass || chapter.classId === selectedClass;
+    const matchSubject = !selectedSubject || chapter.subjectId === selectedSubject;
+    return matchClass && matchSubject;
+  });
+
+  // Filter concepts by selected chapter
+  const filteredConcepts = concepts.filter(concept => {
+    return !selectedChapter || concept.chapterId === selectedChapter;
+  });
 
   const downloadSelectionsToFolder = async () => {
     if (!selections.length) {
       alert("No selections to download");
       return;
     }
+
+    // Show modal for class/subject/concept selection
+    setShowModal(true);
+  };
+
+  const confirmDownload = async () => {
+    if (!selectedClass || !selectedSubject || !selectedChapter || !selectedConcept) {
+      alert("Please select Class, Subject, Chapter, and Concept");
+      return;
+    }
+
+    setShowModal(false);
 
     try {
       // If no folder selected yet, ask user to pick the root folder
@@ -116,7 +173,7 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         await writable.write(blob);
         await writable.close();
 
-        // Add to new metadata
+        // Add to new metadata with relations
         newMetadata.push({
           id: imageUuid,
           filename: filename,
@@ -126,6 +183,10 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
           status: sel.status,
           rectPdf: sel.rectPdf,
           rectScreen: sel.rectScreen,
+          classId: selectedClass,
+          subjectId: selectedSubject,
+          chapterId: selectedChapter,
+          conceptId: selectedConcept,
           meta: sel.meta,
           timestamp: new Date().toISOString()
         });
@@ -145,6 +206,12 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
 
       alert(`✅ Saved ${selections.length} new images to db folder. Total: ${combinedMetadata.length} images`);
 
+      // Reset selections
+      setSelectedClass('');
+      setSelectedSubject('');
+      setSelectedChapter('');
+      setSelectedConcept('');
+
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('User cancelled folder selection');
@@ -152,17 +219,6 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         console.error('Error writing files:', err);
         alert('Error saving files: ' + err.message);
       }
-    }
-  };
-
-  // Optional: Change root folder
-  const changeSaveFolder = async () => {
-    try {
-      rootFolderHandle = await window.showDirectoryPicker();
-      dbFolderHandle = null; // Reset db folder handle
-      alert('Save folder updated! A "db" folder will be created on next save.');
-    } catch (err) {
-      console.log('Folder selection cancelled');
     }
   };
 
@@ -216,17 +272,9 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
     }
   };
 
-  const onDelete = (selection) => {
-    if (mode === "delete") {
-      const updatedSelections = selections.filter(s => s.id !== selection.id);
-      onCropCreate?.(updatedSelections);
-    }
-  };
-
   useEffect(() => {
     renderPage();
   }, [pdf, pageNo, zoom]);
-
 
   const overlapsExisting = (r) => {
     return selections.some(s =>
@@ -282,14 +330,11 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
     }
   };
 
-
-
   const handleMouseMove = e => {
     const bounds = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - bounds.left;
     const y = e.clientY - bounds.top;
 
-    // --- RESIZE MODE ---
     if (resizing) {
       const { sel, handle } = resizing;
       const r = { ...sel.rectScreen };
@@ -309,16 +354,13 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         r.h = y - r.y;
       }
 
-      // Prevent negative flip
       r.w = Math.max(10, r.w);
       r.h = Math.max(10, r.h);
 
       sel.rectScreen = r;
-      onUpdateSelection?.(sel);
       return;
     }
 
-    // --- DRAW MODE ---
     if (!dragging) return;
 
     const rx = Math.min(x, startPos.current.x);
@@ -328,7 +370,6 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
 
     setRect({ x: rx, y: ry, w: rw, h: rh });
   };
-
 
   const handleMouseUp = () => {
     if (resizing) {
@@ -343,7 +384,6 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
 
     setDragging(false);
 
-    // ❌ reject overlapping selections
     if (overlapsExisting(rect)) {
       setRect(null);
       return;
@@ -376,20 +416,9 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
     setRect(null);
   };
 
-  const handleDelete = () => {
-    if (!activeId) return;
-
-    setSelections(prev =>
-      prev.filter(sel => sel.id !== activeId)
-    );
-
-    setActiveId(null);
-  };
-
-
   return (
     <div>
-      <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
         <button onClick={openPdf}>Open PDF</button>
 
         <button disabled={!pdf || pageNo === 1}
@@ -406,7 +435,7 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
           Next ▶
         </button>
 
-        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => setMode("draw")}
             style={{
@@ -442,6 +471,113 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         <button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}>Zoom -</button>
       </div>
 
+      {/* Modal for selecting class, subject, chapter, concept */}
+      {showModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "white",
+            padding: 24,
+            borderRadius: 8,
+            minWidth: 400,
+            maxWidth: 600
+          }}>
+            <h2 style={{ marginBottom: 16 }}>Select Relations for Images</h2>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Class:</label>
+              <select
+                value={selectedClass}
+                onChange={(e) => {
+                  setSelectedClass(e.target.value);
+                  setSelectedChapter('');
+                  setSelectedConcept('');
+                }}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="">Select Class</option>
+                {classes.map(cls => (
+                  <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Subject:</label>
+              <select
+                value={selectedSubject}
+                onChange={(e) => {
+                  setSelectedSubject(e.target.value);
+                  setSelectedChapter('');
+                  setSelectedConcept('');
+                }}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="">Select Subject</option>
+                {subjects.map(subj => (
+                  <option key={subj.id} value={subj.id}>{subj.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Chapter:</label>
+              <select
+                value={selectedChapter}
+                onChange={(e) => {
+                  setSelectedChapter(e.target.value);
+                  setSelectedConcept('');
+                }}
+                disabled={!selectedClass || !selectedSubject}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="">Select Chapter</option>
+                {filteredChapters.map(chap => (
+                  <option key={chap.id} value={chap.id}>{chap.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>Concept:</label>
+              <select
+                value={selectedConcept}
+                onChange={(e) => setSelectedConcept(e.target.value)}
+                disabled={!selectedChapter}
+                style={{ width: "100%", padding: 8, border: "1px solid #ccc", borderRadius: 4 }}
+              >
+                <option value="">Select Concept</option>
+                {filteredConcepts.map(concept => (
+                  <option key={concept.id} value={concept.id}>{concept.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{ padding: "8px 16px", border: "1px solid #ccc", borderRadius: 4, background: "#f5f5f5" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDownload}
+                style={{ padding: "8px 16px", border: "none", borderRadius: 4, background: "#007bff", color: "white" }}
+              >
+                Save Images
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PAGE + OVERLAY CONTAINER */}
       <div
         style={{
@@ -453,8 +589,6 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
-
-        {/* The PDF canvas (REQUIRED for getContext) */}
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
@@ -463,7 +597,6 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
           onMouseUp={handleMouseUp}
         />
 
-        {/* Overlay layer for selections */}
         <div
           ref={overlayRef}
           style={{
@@ -472,7 +605,6 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
             pointerEvents: "auto"
           }}
         >
-          {/* Existing saved selections */}
           {selections
             .filter(s => s.pageNo === pageNo)
             .map(s => (
@@ -491,13 +623,10 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
                       : s.id === activeSelection?.id
                         ? "3px solid #007bff"
                         : "2px dashed #00aaff",
-
                   background: "rgba(0,150,255,0.08)",
                   cursor: "pointer"
                 }}
               >
-
-                {/* 🟦 Show resize handles ONLY for active box */}
                 {activeSelection?.id === s.id && (
                   <>
                     {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(handle => (
@@ -512,13 +641,11 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
                           background: "#fff",
                           border: "2px solid #007bff",
                           borderRadius: 4,
-                          cursor: `${handle} -resize`,
-
+                          cursor: `${handle}-resize`,
                           left:
                             handle.includes("w") ? -5 :
                               handle.includes("e") ? s.rectScreen.w - 5 :
                                 s.rectScreen.w / 2 - 5,
-
                           top:
                             handle.includes("n") ? -5 :
                               handle.includes("s") ? s.rectScreen.h - 5 :
@@ -528,13 +655,9 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
                     ))}
                   </>
                 )}
-
               </div>
             ))}
 
-
-
-          {/* Box currently being drawn */}
           {rect && (
             <div
               style={{
@@ -552,6 +675,4 @@ export default function PdfViewer({ clearAllSelection, onCropCreate, onPageRende
       </div>
     </div>
   );
-
 }
-
