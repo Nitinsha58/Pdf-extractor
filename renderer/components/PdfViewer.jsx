@@ -1,705 +1,641 @@
 import { useState, useRef, useEffect } from "react";
 import pdfjsLib from "../pdf/pdfConfig";
-import { v4 as uuidv4 } from "uuid";
-import { loadData } from "../data";
+import Toolbar from "./Toolbar";
+import CanvasOverlay from "./CanvasOverlay";
 
 export default function PdfViewer({
-  clearAllSelection,
-  onCropCreate,
-  onPageRender,
-  selections,
-  activeSelection
+	clearAllSelection,
+	onCropCreate,
+	onPageRender,
+	selections,
+	activeSelection,
+	updateActiveSelection,
+	isUploading,
+	setIsUploading,
+	uploadProgress,
+	setUploadProgress,
+	patchSelectionById,
 }) {
-  const canvasRef = useRef(null);
-  const overlayRef = useRef(null);
-  const [pdf, setPdf] = useState(null);
-  const [pageNo, setPageNo] = useState(1);
-  const [zoom, setZoom] = useState(1.5);
-  const [mode, setMode] = useState("draw");
-  const [activeId, setActiveId] = useState(null);
-  const [resizing, setResizing] = useState(null);
+	const canvasRefs = useRef({});
+	const overlayRefs = useRef({});
+	const scrollContainerRef = useRef(null);
+	const pageWrapperRefs = useRef({});
+	const [pdf, setPdf] = useState(null);
+	const [numPages, setNumPages] = useState(0);
+	const [zoom, setZoom] = useState(1.5);
+	const [mode, setMode] = useState("draw");
+	const [rect, setRect] = useState(null);
+	const [drawingPageNo, setDrawingPageNo] = useState(null);
+	const [classes, setClasses] = useState([]);
+	const [subjects, setSubjects] = useState([]);
+	const [chapters, setChapters] = useState([]);
+	const [imageTypes, setImageTypes] = useState([]);
+	const [selectedClassId, setSelectedClassId] = useState(null);
+	const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+	const [selectedChapterId, setSelectedChapterId] = useState(null);
+	const [selectedImageTypeId, setSelectedImageTypeId] = useState(null);
+	const [toastMessage, setToastMessage] = useState("");
+	const toastTimerRef = useRef(null);
+	const skipBeforeUnloadRef = useRef(false);
+	const startPos = useRef({ x: 0, y: 0 });
+	const viewportByPageRef = useRef({});
+	const resizeHandleRef = useRef(null);
 
-  // Relation data
-  const [classes, setClasses] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [chapters, setChapters] = useState([]);
-  const [concepts, setConcepts] = useState([]);
+	// 1cm at 96 CSS px/inch (approx). Used to prevent accidental click-boxes.
+	const MIN_BOX_SIZE_PX = Math.round((96 / 2.54) * 1);
 
-  // Selection modal
-  const [showModal, setShowModal] = useState(false);
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedChapter, setSelectedChapter] = useState('');
-  const [selectedConcept, setSelectedConcept] = useState('');
+	const API_BASE = "http://localhost:8000";
 
-  // Additional attributes
-  const [questionType, setQuestionType] = useState('MCQ');
-  const [difficulty, setDifficulty] = useState('easy');
-  const [marks, setMarks] = useState(1);
-  const [usage, setUsage] = useState('HW');
-  const [priority, setPriority] = useState(0);
+	useEffect(() => {
+		renderAllPages();
+	}, [pdf, zoom]);
 
-  // crop state
-  const [dragging, setDragging] = useState(false);
-  const [rect, setRect] = useState(null);
-  const startPos = useRef({ x: 0, y: 0 });
-  const viewportRef = useRef(null);
-  const pageRef = useRef(null);
+	useEffect(() => {
+		return () => {
+			if (toastTimerRef.current) {
+				clearTimeout(toastTimerRef.current);
+				toastTimerRef.current = null;
+			}
+		};
+	}, []);
 
-  let dbFolderHandle = useRef(null);
+	const pushToast = (message) => {
+		setToastMessage(message);
+		if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+		toastTimerRef.current = setTimeout(() => {
+			setToastMessage("");
+			toastTimerRef.current = null;
+		}, 2500);
+	};
 
-  useEffect(() => {
-    const fetchRelationData = async () => {
-      const result = await loadData();
-      const savedClasses = localStorage.getItem('classes');
-      setClasses(savedClasses ? JSON.parse(savedClasses) : result.classes);
-      const savedSubjects = localStorage.getItem('subject');
-      setSubjects(savedSubjects ? JSON.parse(savedSubjects) : result.subject);
-      const savedChapters = localStorage.getItem('chapter');
-      setChapters(savedChapters ? JSON.parse(savedChapters) : result.chapter);
-      const savedConcepts = localStorage.getItem('concept');
-      setConcepts(savedConcepts ? JSON.parse(savedConcepts) : result.concept);
-    };
-    fetchRelationData();
-  }, []);
+	useEffect(() => {
+		const loadTaxonomy = async () => {
+			try {
+				const [classesResp, subjectsResp, imageTypesResp] =
+					await Promise.all([
+						fetch(`${API_BASE}/api/classes/`),
+						fetch(`${API_BASE}/api/subjects/`),
+						fetch(`${API_BASE}/api/image-types/`),
+					]);
+				if (classesResp.ok) setClasses(await classesResp.json());
+				if (subjectsResp.ok) setSubjects(await subjectsResp.json());
+				if (imageTypesResp.ok) {
+					const data = await imageTypesResp.json();
+					setImageTypes(data);
+					if (
+						!selectedImageTypeId &&
+						Array.isArray(data) &&
+						data.length
+					) {
+						setSelectedImageTypeId(String(data[0].id));
+					}
+				}
+			} catch (e) {
+				console.error("Failed loading taxonomy", e);
+			}
+		};
+		loadTaxonomy();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
-  const filteredChapters = chapters.filter(chapter => {
-    const matchClass = !selectedClass || chapter.classId === selectedClass;
-    const matchSubject = !selectedSubject || chapter.subjectId === selectedSubject;
-    return matchClass && matchSubject;
-  });
+	useEffect(() => {
+		const loadChapters = async () => {
+			setChapters([]);
+			setSelectedChapterId(null);
+			if (!selectedClassId || !selectedSubjectId) return;
+			try {
+				const resp = await fetch(
+					`${API_BASE}/api/chapters/?class_id=${encodeURIComponent(
+						selectedClassId
+					)}&subject_id=${encodeURIComponent(selectedSubjectId)}`
+				);
+				if (!resp.ok) return;
+				setChapters(await resp.json());
+			} catch (e) {
+				console.error("Failed loading chapters", e);
+			}
+		};
+		loadChapters();
+	}, [selectedClassId, selectedSubjectId]);
 
-  const filteredConcepts = concepts.filter(concept => {
-    return !selectedChapter || concept.chapterId === selectedChapter;
-  });
+	useEffect(() => {
+		const handleBeforeUnload = (e) => {
+			if (skipBeforeUnloadRef.current) return;
+			if (!selections?.length) return;
+			e.preventDefault();
+			// Required for most browsers to show the native confirmation dialog
+			e.returnValue = "";
+		};
 
-  const downloadSelectionsToFolder = async () => {
-    if (!selections.length) {
-      alert("No selections to download");
-      return;
-    }
-    setShowModal(true);
-  };
+		window.addEventListener("beforeunload", handleBeforeUnload);
+		return () =>
+			window.removeEventListener("beforeunload", handleBeforeUnload);
+	}, [selections]);
 
-  const confirmDownload = async () => {
-    if (!selectedClass || !selectedSubject || !selectedChapter || !selectedConcept) {
-      alert("Please select Class, Subject, Chapter, and Concept");
-      return;
-    }
-    setShowModal(false);
+	useEffect(() => {
+		const sel = activeSelection;
+		if (!sel?.pageNo || !sel?.rectScreen) return;
+		const container = scrollContainerRef.current;
+		const wrapper = pageWrapperRefs.current?.[sel.pageNo];
+		if (!container || !wrapper) return;
 
-    try {
-      if (!dbFolderHandle.current) {
-        dbFolderHandle.current = await window.showDirectoryPicker();
-      }
+		// Scroll to page + approximate y within the page.
+		const yInPage = Number(sel.rectScreen?.y || 0);
+		const top = Math.max(0, wrapper.offsetTop + yInPage - 40);
+		container.scrollTo({ top, behavior: "smooth" });
+	}, [activeSelection?.id]);
 
-      try {
-        await dbFolderHandle.current.requestPermission({ mode: 'readwrite' });
-      } catch (err) {
-        dbFolderHandle.current = await window.showDirectoryPicker();
-      }
+	// Upload captured selections to backend with random metadata
+	const uploadSelections = async () => {
+		if (!selections?.length) {
+			pushToast("No selections to upload.");
+			return;
+		}
+		if (isUploading) return;
 
-      let existingMetadata = [];
-      try {
-        const storedMetadata = localStorage.getItem('imageMetadata');
-        if (storedMetadata) {
-          existingMetadata = JSON.parse(storedMetadata);
-        }
-      } catch (err) {
-        console.log('No existing metadata found in localStorage, creating new one');
-      }
+		setIsUploading?.(true);
+		setUploadProgress?.({ current: 0, total: selections.length });
+		pushToast(`Uploading ${selections.length} selection(s)...`);
 
-      const newMetadata = [];
-      for (let i = 0; i < selections.length; i++) {
-        const sel = selections[i];
-        const page = await pdf.ref.getPage(sel.pageNo);
-        const scale = 2;
-        const viewport = page.getViewport({ scale });
+		try {
+			const items = [];
+			const form = new FormData();
 
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCanvas.width = viewport.width;
-        tempCanvas.height = viewport.height;
-        await page.render({ canvasContext: tempCtx, viewport: viewport }).promise;
+			for (let i = 0; i < selections.length; i++) {
+				const sel = selections[i];
+				setUploadProgress?.({ current: i, total: selections.length });
 
-        const croppedCanvas = document.createElement('canvas');
-        const croppedCtx = croppedCanvas.getContext('2d');
-        croppedCanvas.width = sel.rectPdf.w * scale;
-        croppedCanvas.height = sel.rectPdf.h * scale;
-        croppedCtx.drawImage(
-          tempCanvas,
-          sel.rectPdf.x * scale,
-          sel.rectPdf.y * scale,
-          sel.rectPdf.w * scale,
-          sel.rectPdf.h * scale,
-          0,
-          0,
-          sel.rectPdf.w * scale,
-          sel.rectPdf.h * scale
-        );
+				const classId = sel.classId || selectedClassId;
+				const subjectId = sel.subjectId || selectedSubjectId;
+				const chapterId = sel.chapterId || selectedChapterId;
+				const imageTypeId = sel.imageTypeId || selectedImageTypeId;
 
-        const blob = await new Promise(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
-        const imageUuid = sel.id || uuidv4();
-        const filename = `${imageUuid}.png`;
+				if (!classId || !subjectId || !chapterId || !imageTypeId) {
+					throw new Error(
+						"Missing class/subject/chapter/image type for a selection."
+					);
+				}
 
-        const fileHandle = await dbFolderHandle.current.getFileHandle(filename, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
+				const pageCanvas = canvasRefs.current?.[sel.pageNo];
+				if (!pageCanvas) {
+					throw new Error(`Missing canvas for page ${sel.pageNo}`);
+				}
 
-        newMetadata.push({
-          id: imageUuid,
-          filename: filename,
-          filepath: `./${filename}`,
-          pageNo: sel.pageNo,
-          type: sel.type,
-          status: sel.status,
-          rectPdf: sel.rectPdf,
-          rectScreen: sel.rectScreen,
-          classId: selectedClass,
-          subjectId: selectedSubject,
-          chapterId: selectedChapter,
-          conceptId: selectedConcept,
-          questionType: questionType,
-          difficulty: difficulty,
-          marks: marks,
-          usage: usage,
-          priority: priority,
-          verified: false,
-          active: true,
-          meta: sel.meta,
-          timestamp: new Date().toISOString()
-        });
-      }
+				const { x, y, w, h } = sel.rectScreen;
+				const off = document.createElement("canvas");
+				off.width = Math.max(1, Math.round(w));
+				off.height = Math.max(1, Math.round(h));
+				const octx = off.getContext("2d");
+				octx.drawImage(
+					pageCanvas,
+					x,
+					y,
+					w,
+					h,
+					0,
+					0,
+					off.width,
+					off.height
+				);
 
-      const combinedMetadata = [...existingMetadata, ...newMetadata];
-      localStorage.setItem('imageMetadata', JSON.stringify(combinedMetadata));
-      alert(`✅ Saved ${selections.length} new images to folder. Total: ${combinedMetadata.length} images. Metadata saved to localStorage.`);
+				const blob = await new Promise((res) =>
+					off.toBlob(res, "image/png")
+				);
+				if (!blob) {
+					throw new Error(
+						`Failed to create image for selection ${sel.id}`
+					);
+				}
 
-      setSelectedClass('');
-      setSelectedSubject('');
-      setSelectedChapter('');
-      setSelectedConcept('');
-      setQuestionType('MCQ');
-      setDifficulty('easy');
-      setMarks(1);
-      setUsage('HW');
-      setPriority(0);
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        console.log('User cancelled folder selection');
-      } else {
-        console.error('Error writing files:', err);
-        alert('Error saving files: ' + err.message);
-      }
-    }
-  };
+				form.append(`image_${i}`, blob, `crop-${sel.id}.png`);
+				items.push({
+					rectPdf: sel.rectPdf || {},
+					rectScreen: sel.rectScreen || {},
+					classId: String(classId),
+					subjectId: String(subjectId),
+					chapterId: String(chapterId),
+					imageType: String(imageTypeId),
+				});
+			}
 
-  const openPdf = async () => {
-    const [fileHandle] = await window.showOpenFilePicker({
-      types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }]
-    });
-    const file = await fileHandle.getFile();
-    const buffer = await file.arrayBuffer();
-    const loaded = await pdfjsLib.getDocument({ data: buffer }).promise;
-    setPdf({ ref: loaded, name: file.name });
-    setPageNo(1);
-    clearAllSelection();
-  };
+			form.append("items", JSON.stringify(items));
+			setUploadProgress?.({
+				current: selections.length,
+				total: selections.length,
+			});
 
-  const startResize = (e, sel, handle) => {
-    e.stopPropagation();
-    setResizing({ sel, handle, startX: e.clientX, startY: e.clientY });
-  };
+			const resp = await fetch(`${API_BASE}/api/upload-crop-bulk/`, {
+				method: "POST",
+				body: form,
+			});
 
-  const renderPage = async () => {
-    if (!pdf) return;
-    const page = await pdf.ref.getPage(pageNo);
-    const viewport = page.getViewport({ scale: zoom });
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    pageRef.current = page;
-    viewportRef.current = viewport;
-    onPageRender?.({ page, viewport, canvas });
-  };
+			if (!resp.ok) {
+				const txt = await resp.text();
+				console.error("Bulk upload failed:", resp.status, txt);
+				pushToast("Upload failed. Nothing was saved.");
+				return;
+			}
 
-  const onSelect = (selection) => {
-    if (mode === "select") {
-      onCropCreate?.(selection);
-    }
-  };
+			// All succeeded -> refresh page as requested
+			skipBeforeUnloadRef.current = true;
+			window.location.reload();
+		} catch (err) {
+			console.error("Upload aborted:", err);
+			pushToast(err?.message || "Upload aborted.");
+		} finally {
+			setIsUploading?.(false);
+		}
+	};
 
-  useEffect(() => {
-    renderPage();
-  }, [pdf, pageNo, zoom]);
+	const openPdf = async () => {
+		const [fileHandle] = await window.showOpenFilePicker({
+			types: [
+				{ description: "PDF", accept: { "application/pdf": [".pdf"] } },
+			],
+		});
+		const file = await fileHandle.getFile();
+		const buffer = await file.arrayBuffer();
+		const loaded = await pdfjsLib.getDocument({ data: buffer }).promise;
+		setPdf({ ref: loaded, name: file.name });
+		setNumPages(loaded.numPages || 0);
+		clearAllSelection();
+	};
 
-  const overlapsExisting = (r) => {
-    return selections.some(s =>
-      s.pageNo === pageNo &&
-      !(
-        r.x + r.w < s.rectScreen.x ||
-        r.x > s.rectScreen.x + s.rectScreen.w ||
-        r.y + r.h < s.rectScreen.y ||
-        r.y > s.rectScreen.y + s.rectScreen.h
-      )
-    );
-  };
+	const renderPage = async (pageNo) => {
+		if (!pdf?.ref) return;
+		const canvas = canvasRefs.current?.[pageNo];
+		if (!canvas) return;
+		const page = await pdf.ref.getPage(pageNo);
+		const viewport = page.getViewport({ scale: zoom });
+		const ctx = canvas.getContext("2d");
+		canvas.width = viewport.width;
+		canvas.height = viewport.height;
+		await page.render({ canvasContext: ctx, viewport }).promise;
+		viewportByPageRef.current[pageNo] = viewport;
+		onPageRender?.({ page, viewport, canvas });
+	};
 
-  const handleMouseDown = e => {
-    if (!viewportRef.current) return;
-    if (e.button !== 0) return;
-    if (mode !== "draw") return;
-    if (resizing) return;
-    const bounds = canvasRef.current.getBoundingClientRect();
-    startPos.current = { x: e.clientX - bounds.left, y: e.clientY - bounds.top };
-    setRect(null);
-    setDragging(true);
-  };
+	const renderAllPages = async () => {
+		if (!pdf?.ref) return;
+		const total = pdf.ref.numPages || numPages || 0;
+		if (!total) return;
+		setNumPages(total);
+		for (let p = 1; p <= total; p += 1) {
+			// sequential rendering keeps memory lower
+			// and avoids hammering the main thread
+			// eslint-disable-next-line no-await-in-loop
+			await renderPage(p);
+		}
+	};
 
-  const hitTest = (x, y) => {
-    return selections.find(sel =>
-      x >= sel.x && x <= sel.x + sel.w && y >= sel.y && y <= sel.y + sel.h
-    );
-  };
+	const getSelectionsForPage = (targetPageNo) =>
+		(selections || []).filter((s) => s?.pageNo === targetPageNo);
 
-  const handleCanvasClick = (e) => {
-    if (mode !== "select") return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const hit = hitTest(x, y);
-    if (hit) {
-      setActiveId(hit.id);
-    } else {
-      setActiveId(null);
-    }
-  };
+	const getNameById = (items, id) => {
+		if (!id) return "";
+		const found = (items || []).find((it) => String(it.id) === String(id));
+		return found?.name || "";
+	};
 
-  const handleMouseMove = e => {
-    const bounds = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - bounds.left;
-    const y = e.clientY - bounds.top;
+	const ensureChapterSelectedForDrawing = () => {
+		if (selectedChapterId) return true;
+		pushToast("Select chapter first before drawing.");
+		return false;
+	};
 
-    if (resizing) {
-      const { sel, handle } = resizing;
-      const r = { ...sel.rectScreen };
-      if (handle.includes("w")) {
-        r.w += r.x - x;
-        r.x = x;
-      }
-      if (handle.includes("n")) {
-        r.h += r.y - y;
-        r.y = y;
-      }
-      if (handle.includes("e")) {
-        r.w = x - r.x;
-      }
-      if (handle.includes("s")) {
-        r.h = y - r.y;
-      }
-      r.w = Math.max(10, r.w);
-      r.h = Math.max(10, r.h);
-      sel.rectScreen = r;
-      return;
-    }
+	const handleMouseDown = (e, pageNo) => {
+		if (e.button !== 0) return; // Only proceed for left mouse button
+		if (isUploading) return;
+		if (mode !== "draw") return;
+		const canvas = canvasRefs.current?.[pageNo];
+		if (!canvas) return;
+		if (!viewportByPageRef.current?.[pageNo]) return;
 
-    if (!dragging) return;
-    const rx = Math.min(x, startPos.current.x);
-    const ry = Math.min(y, startPos.current.y);
-    const rw = Math.abs(x - startPos.current.x);
-    const rh = Math.abs(y - startPos.current.y);
-    setRect({ x: rx, y: ry, w: rw, h: rh });
-  };
+		const bounds = canvas.getBoundingClientRect();
+		const x = e.clientX - bounds.left;
+		const y = e.clientY - bounds.top;
 
-  const handleMouseUp = () => {
-    if (resizing) {
-      setResizing(null);
-      return;
-    }
-    if (!dragging || !rect) {
-      setDragging(false);
-      return;
-    }
-    setDragging(false);
-    if (overlapsExisting(rect)) {
-      setRect(null);
-      return;
-    }
-    if (!rect || !viewportRef.current) {
-      setDragging(false);
-      return;
-    }
-    setDragging(false);
-    const scale = 1 / viewportRef.current.scale;
-    const pdfRect = {
-      x: Math.round(rect.x * scale),
-      y: Math.round(rect.y * scale),
-      w: Math.round(rect.w * scale),
-      h: Math.round(rect.h * scale)
-    };
-    onCropCreate?.({
-      rectPdf: pdfRect,
-      rectScreen: rect,
-      pageNo,
-      page: pageRef.current,
-      viewport: viewportRef.current
-    });
-    setRect(null);
-  };
+		const selectionsForPage = getSelectionsForPage(pageNo);
 
-  return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Top Toolbar */}
-      <div className="flex items-center gap-2 p-3 bg-white border-b border-gray-200 flex-wrap">
-        <button
-          onClick={openPdf}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          📂 Open PDF
-        </button>
+		// Check if clicking on an existing selection (current page only)
+		const clickedSelection = selectionsForPage.find(
+			(sel) =>
+				x >= sel.rectScreen.x &&
+				x <= sel.rectScreen.x + sel.rectScreen.w &&
+				y >= sel.rectScreen.y &&
+				y <= sel.rectScreen.y + sel.rectScreen.h
+		);
 
-        <button
-          onClick={() => setPageNo(p => Math.max(1, p - 1))}
-          disabled={pageNo <= 1}
-          className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          ◀ Prev
-        </button>
+		if (clickedSelection) {
+			updateActiveSelection(clickedSelection);
+			return;
+		}
 
-        <span className="px-4 py-2 bg-gray-100 rounded">
-          Page {pageNo} / {pdf?.ref?.numPages || "--"}
-        </span>
+		if (!ensureChapterSelectedForDrawing()) return;
 
-        <button
-          onClick={() => setPageNo(p => Math.min(pdf?.ref?.numPages || p, p + 1))}
-          disabled={!pdf || pageNo >= pdf.ref.numPages}
-          className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Next ▶
-        </button>
+		// Start drawing a new rectangle
+		startPos.current = { x, y };
+		setRect({ x, y, w: 0, h: 0 });
+		setDrawingPageNo(pageNo);
+		updateActiveSelection(null); // Deselect any active selection
+	};
 
-        <div className="h-8 w-px bg-gray-300 mx-2"></div>
+	const handleMouseMove = (e, pageNo) => {
+		if (isUploading) return;
+		if (!rect || drawingPageNo !== pageNo) return;
+		const canvas = canvasRefs.current?.[pageNo];
+		if (!canvas) return;
 
-        <button
-          onClick={() => setMode("draw")}
-          className={`px-4 py-2 rounded transition-colors ${mode === "draw"
-              ? "bg-blue-600 text-white border-2 border-blue-700"
-              : "bg-white border border-gray-300 hover:bg-gray-100"
-            }`}
-        >
-          ✏️ Draw
-        </button>
+		const bounds = canvas.getBoundingClientRect();
+		const x = e.clientX - bounds.left;
+		const y = e.clientY - bounds.top;
 
-        <button
-          onClick={() => setMode("select")}
-          className={`px-4 py-2 rounded transition-colors ${mode === "select"
-              ? "bg-blue-600 text-white border-2 border-blue-700"
-              : "bg-white border border-gray-300 hover:bg-gray-100"
-            }`}
-        >
-          🖱 Select/Edit
-        </button>
+		const rx = Math.min(x, startPos.current.x);
+		const ry = Math.min(y, startPos.current.y);
+		const rw = Math.abs(x - startPos.current.x);
+		const rh = Math.abs(y - startPos.current.y);
 
-        <button
-          onClick={() => setMode("delete")}
-          className={`px-4 py-2 rounded transition-colors ${mode === "delete"
-              ? "bg-blue-600 text-white border-2 border-blue-700"
-              : "bg-white border border-gray-300 hover:bg-gray-100"
-            }`}
-        >
-          🗑 Delete
-        </button>
+		setRect({ x: rx, y: ry, w: rw, h: rh });
+	};
 
-        <button
-          onClick={downloadSelectionsToFolder}
-          disabled={!selections.length}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          💾 Download All Selections
-        </button>
+	const handleMouseUp = (e, pageNo) => {
+		if (isUploading) return;
+		if (!rect || drawingPageNo !== pageNo) return;
+		const viewport = viewportByPageRef.current?.[pageNo];
+		if (!viewport) return;
 
-        <div className="h-8 w-px bg-gray-300 mx-2"></div>
+		// Chapter is required for creating a box
+		if (!selectedChapterId) {
+			setRect(null);
+			setDrawingPageNo(null);
+			pushToast("Select chapter first before drawing.");
+			return;
+		}
 
-        <button
-          onClick={() => setZoom(z => z + 0.25)}
-          className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
-        >
-          Zoom +
-        </button>
+		const selectionsForPage = getSelectionsForPage(pageNo);
 
-        <button
-          onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
-          className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
-        >
-          Zoom -
-        </button>
-      </div>
+		// Minimum size to prevent accidental click-boxes
+		if (rect.w < MIN_BOX_SIZE_PX || rect.h < MIN_BOX_SIZE_PX) {
+			setRect(null);
+			setDrawingPageNo(null);
+			pushToast("Minimum box size is 1cm × 1cm.");
+			return;
+		}
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6">Select Relations for Images</h2>
+		// Check if the rectangle overlaps with existing selections (current page only)
+		const overlaps = selectionsForPage.some(
+			(sel) =>
+				rect.x + rect.w > sel.rectScreen.x &&
+				rect.x < sel.rectScreen.x + sel.rectScreen.w &&
+				rect.y + rect.h > sel.rectScreen.y &&
+				rect.y < sel.rectScreen.y + sel.rectScreen.h
+		);
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Class:
-                  </label>
-                  <select
-                    value={selectedClass}
-                    onChange={(e) => {
-                      setSelectedClass(e.target.value);
-                      setSelectedChapter('');
-                      setSelectedConcept('');
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Class</option>
-                    {classes.map(cls => (
-                      <option key={cls.id} value={cls.id}>{cls.name}</option>
-                    ))}
-                  </select>
-                </div>
+		if (overlaps) {
+			setRect(null);
+			setDrawingPageNo(null);
+			return;
+		}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subject:
-                  </label>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => {
-                      setSelectedSubject(e.target.value);
-                      setSelectedChapter('');
-                      setSelectedConcept('');
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Subject</option>
-                    {subjects.map(subj => (
-                      <option key={subj.id} value={subj.id}>{subj.name}</option>
-                    ))}
-                  </select>
-                </div>
+		const scale = 1 / viewport.scale;
+		const pdfRect = {
+			x: Math.round(rect.x * scale),
+			y: Math.round(rect.y * scale),
+			w: Math.round(rect.w * scale),
+			h: Math.round(rect.h * scale),
+		};
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Chapter:
-                  </label>
-                  <select
-                    value={selectedChapter}
-                    onChange={(e) => {
-                      setSelectedChapter(e.target.value);
-                      setSelectedConcept('');
-                    }}
-                    disabled={!selectedClass || !selectedSubject}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Select Chapter</option>
-                    {filteredChapters.map(chap => (
-                      <option key={chap.id} value={chap.id}>{chap.name}</option>
-                    ))}
-                  </select>
-                </div>
+		const newSelection = {
+			id: `${pageNo}-${Date.now()}`,
+			rectScreen: rect,
+			rectPdf: pdfRect,
+			pageNo,
+			classId: selectedClassId,
+			className: getNameById(classes, selectedClassId),
+			subjectId: selectedSubjectId,
+			subjectName: getNameById(subjects, selectedSubjectId),
+			chapterId: selectedChapterId,
+			chapterName: getNameById(chapters, selectedChapterId),
+			imageTypeId: selectedImageTypeId,
+			imageTypeName: getNameById(imageTypes, selectedImageTypeId),
+			status: "unsaved",
+		};
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Concept:
-                  </label>
-                  <select
-                    value={selectedConcept}
-                    onChange={(e) => setSelectedConcept(e.target.value)}
-                    disabled={!selectedChapter}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Select Concept</option>
-                    {filteredConcepts.map(concept => (
-                      <option key={concept.id} value={concept.id}>{concept.name}</option>
-                    ))}
-                  </select>
-                </div>
+		onCropCreate?.(newSelection);
+		// Activate the new selection so list + scroll syncing works immediately
+		updateActiveSelection?.(newSelection);
+		setRect(null);
+		setDrawingPageNo(null);
+	};
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Question Type:
-                  </label>
-                  <select
-                    value={questionType}
-                    onChange={(e) => setQuestionType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="MCQ">MCQ</option>
-                    <option value="Numerical">Numerical</option>
-                    <option value="Theory">Theory</option>
-                    <option value="CASE">CASE</option>
-                  </select>
-                </div>
+	// 🔹 Store starting mouse + rect values for smoother resize
+	const handleResizeStart = (e, handle, pageNo) => {
+		if (isUploading) return;
+		e.stopPropagation();
+		const canvas = canvasRefs.current?.[pageNo];
+		if (!canvas) return;
+		const bounds = canvas.getBoundingClientRect();
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty:
-                  </label>
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
+		// store start mouse, start rect and a reference to the selection being resized
+		resizeHandleRef.current = {
+			handle,
+			startMouse: {
+				x: e.clientX - bounds.left,
+				y: e.clientY - bounds.top,
+			},
+			startRect: { ...activeSelection.rectScreen },
+			startSelection: { ...activeSelection },
+			currentSelection: null,
+		};
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Marks:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={marks}
-                    onChange={(e) => setMarks(parseInt(e.target.value) || 1)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+		document.addEventListener("mousemove", handleResizeMove);
+		document.addEventListener("mouseup", handleResizeEnd);
+	};
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Usage:
-                  </label>
-                  <select
-                    value={usage}
-                    onChange={(e) => setUsage(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="HW">HW</option>
-                    <option value="CW">CW</option>
-                    <option value="Exercise">Exercise</option>
-                    <option value="Test">Test</option>
-                    <option value="Compact">Compact</option>
-                    <option value="Smart">Smart</option>
-                  </select>
-                </div>
+	const handleResizeMove = (e) => {
+		if (isUploading) return;
+		if (!resizeHandleRef.current) return;
+		const pageNo =
+			resizeHandleRef.current?.startSelection?.pageNo ||
+			activeSelection?.pageNo;
+		const canvas = pageNo ? canvasRefs.current?.[pageNo] : null;
+		if (!canvas) return;
+		const bounds = canvas.getBoundingClientRect();
+		const x = e.clientX - bounds.left;
+		const y = e.clientY - bounds.top;
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Priority (0-5):
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    value={priority}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      setPriority(Math.min(5, Math.max(0, val)));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+		const { handle, startMouse, startRect, startSelection } =
+			resizeHandleRef.current;
 
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDownload}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Save Images
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+		const dx = x - startMouse.x;
+		const dy = y - startMouse.y;
 
-      {/* Canvas Container */}
-      <div className="flex-1 overflow-auto bg-gray-100 p-4">
-        <div className="inline-block relative">
-          <canvas
-            ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onClick={handleCanvasClick}
-            className="border border-gray-400 shadow-lg bg-white cursor-crosshair"
-          />
+		const updatedRect = { ...startRect };
 
-          <div
-            ref={overlayRef}
-            className="absolute inset-0 pointer-events-none"
-          >
-            {selections
-              .filter(s => s.pageNo === pageNo)
-              .map(s => (
-                <div
-                  key={s.id}
-                  onClick={() => onSelect(s)}
-                  className="absolute cursor-pointer"
-                  style={{
-                    left: s.rectScreen.x,
-                    top: s.rectScreen.y,
-                    width: s.rectScreen.w,
-                    height: s.rectScreen.h,
-                    border: mode === "delete" && s.id === activeId
-                      ? "3px solid red"
-                      : s.id === activeSelection?.id
-                        ? "3px solid #007bff"
-                        : "2px dashed #00aaff",
-                    background: "rgba(0,150,255,0.08)",
-                    pointerEvents: "auto"
-                  }}
-                >
-                  {activeSelection?.id === s.id && (
-                    <>
-                      {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(handle => (
-                        <div
-                          key={handle}
-                          onMouseDown={(e) => startResize(e, s, handle)}
-                          className="absolute w-2.5 h-2.5 bg-white border-2 border-blue-600 rounded pointer-events-auto"
-                          style={{
-                            cursor: `${handle}-resize`,
-                            left: handle.includes("w")
-                              ? -5
-                              : handle.includes("e")
-                                ? s.rectScreen.w - 5
-                                : s.rectScreen.w / 2 - 5,
-                            top: handle.includes("n")
-                              ? -5
-                              : handle.includes("s")
-                                ? s.rectScreen.h - 5
-                                : s.rectScreen.h / 2 - 5
-                          }}
-                        />
-                      ))}
-                    </>
-                  )}
-                </div>
-              ))}
+		// 🔹 East (right)
+		if (handle.includes("e")) {
+			updatedRect.w = startRect.w + dx;
+		}
 
-            {rect && (
-              <div
-                className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none"
-                style={{
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.w,
-                  height: rect.h
-                }}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+		// 🔹 South (bottom)
+		if (handle.includes("s")) {
+			updatedRect.h = startRect.h + dy;
+		}
+
+		// 🔹 West (left)
+		if (handle.includes("w")) {
+			updatedRect.x = startRect.x + dx;
+			updatedRect.w = startRect.w - dx;
+		}
+
+		// 🔹 North (top)
+		if (handle.includes("n")) {
+			updatedRect.y = startRect.y + dy;
+			updatedRect.h = startRect.h - dy;
+		}
+
+		// 🔹 Prevent inversion
+		updatedRect.w = Math.max(10, updatedRect.w);
+		updatedRect.h = Math.max(10, updatedRect.h);
+
+		const selectionsForPage = getSelectionsForPage(
+			activeSelection?.pageNo ?? pageNo
+		);
+		const overlaps = selectionsForPage.some(
+			(sel) =>
+				sel.id !== activeSelection.id &&
+				updatedRect.x < sel.rectScreen.x + sel.rectScreen.w &&
+				updatedRect.x + updatedRect.w > sel.rectScreen.x &&
+				updatedRect.y < sel.rectScreen.y + sel.rectScreen.h &&
+				updatedRect.y + updatedRect.h > sel.rectScreen.y
+		);
+
+		if (overlaps) return; // 🚫 block resize into another box
+
+		const viewport = viewportByPageRef.current?.[activeSelection?.pageNo];
+		if (!viewport) return;
+		// 🔹 Convert to PDF coords (scale-aware)
+		const scale = 1 / viewport.scale;
+
+		const pdfRect = {
+			x: Math.round(updatedRect.x * scale),
+			y: Math.round(updatedRect.y * scale),
+			w: Math.round(updatedRect.w * scale),
+			h: Math.round(updatedRect.h * scale),
+		};
+
+		const updatedSelection = {
+			...startSelection,
+			rectScreen: updatedRect,
+			rectPdf: pdfRect,
+		};
+
+		// store the current virtual selection so handleResizeEnd can persist it
+		resizeHandleRef.current.currentSelection = updatedSelection;
+
+		updateActiveSelection(updatedSelection);
+	};
+
+	const handleResizeEnd = () => {
+		document.removeEventListener("mousemove", handleResizeMove);
+		document.removeEventListener("mouseup", handleResizeEnd);
+
+		// grab the last virtual selection (if any) before clearing the ref
+		const finalSel =
+			resizeHandleRef.current?.currentSelection ||
+			resizeHandleRef.current?.startSelection ||
+			null;
+
+		resizeHandleRef.current = null;
+
+		if (!finalSel) return;
+
+		// persist the final selection
+		updateActiveSelection({ ...finalSel });
+	};
+
+	return (
+		<div className="flex flex-col h-screen bg-gray-50">
+			{toastMessage ? (
+				<div className="fixed top-4 right-4 z-50">
+					<div className="bg-white border border-gray-300 text-gray-900 px-4 py-3 rounded shadow-md max-w-sm">
+						<div className="flex items-start gap-3">
+							<div className="flex-1 text-sm">{toastMessage}</div>
+							<button
+								onClick={() => setToastMessage("")}
+								className="text-gray-500 hover:text-gray-700 leading-none"
+								aria-label="Close notification">
+								×
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
+			<Toolbar
+				openPdf={openPdf}
+				pdf={pdf}
+				mode={mode}
+				setMode={setMode}
+				onUpload={uploadSelections}
+				isUploading={isUploading}
+				uploadProgress={uploadProgress}
+				classes={classes}
+				subjects={subjects}
+				chapters={chapters}
+				imageTypes={imageTypes}
+				selectedClassId={selectedClassId}
+				setSelectedClassId={setSelectedClassId}
+				selectedSubjectId={selectedSubjectId}
+				setSelectedSubjectId={setSelectedSubjectId}
+				selectedChapterId={selectedChapterId}
+				setSelectedChapterId={setSelectedChapterId}
+				selectedImageTypeId={selectedImageTypeId}
+				setSelectedImageTypeId={setSelectedImageTypeId}
+			/>
+			<div
+				ref={scrollContainerRef}
+				className="flex-1 overflow-auto bg-gray-100 p-4">
+				<div className="flex flex-col gap-6">
+					{Array.from({ length: numPages || 0 }, (_, i) => i + 1).map(
+						(p) => (
+							<div
+								key={p}
+								ref={(el) => {
+									if (el) pageWrapperRefs.current[p] = el;
+								}}
+								className="inline-block">
+								<div className="relative inline-block">
+									<canvas
+										ref={(el) => {
+											if (el) canvasRefs.current[p] = el;
+										}}
+										onMouseDown={(e) =>
+											handleMouseDown(e, p)
+										}
+										onMouseMove={(e) =>
+											handleMouseMove(e, p)
+										}
+										onMouseUp={(e) => handleMouseUp(e, p)}
+										className="border border-gray-400 shadow-lg bg-white cursor-crosshair"
+									/>
+									<CanvasOverlay
+										overlayRef={(el) => {
+											if (el) overlayRefs.current[p] = el;
+										}}
+										selections={selections}
+										rect={drawingPageNo === p ? rect : null}
+										pageNo={p}
+										activeSelection={activeSelection}
+										onResizeHandleMouseDown={(e, handle) =>
+											handleResizeStart(e, handle, p)
+										}
+									/>
+								</div>
+							</div>
+						)
+					)}
+				</div>
+			</div>
+		</div>
+	);
 }

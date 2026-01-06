@@ -1,50 +1,181 @@
-export default function SelectionList({ deleteSpecificSelection, selections, activeId, onSelect }) {
-  return (
-    <div className="w-64 border-l border-gray-300 p-3 overflow-y-auto bg-white">
-      <h3 className="text-lg font-bold mb-4 text-gray-800">Selections</h3>
+import { useEffect, useRef, useState } from "react";
 
-      {!selections.length && (
-        <p className="text-gray-500 text-sm">No selections yet</p>
-      )}
+export default function SelectionList({
+	deleteSpecificSelection,
+	selections,
+	activeId,
+	onSelect,
+	onUpdateSelection,
+	disabled,
+}) {
+	const itemRefs = useRef({});
+	const [imageTypes, setImageTypes] = useState([]);
 
-      {selections.map(sel => (
-        <div
-          key={sel.id}
-          onClick={() => onSelect(sel.id)}
-          className={`p-3 mb-2 rounded-lg cursor-pointer transition-all ${sel.id === activeId
-              ? "border-2 border-blue-600 shadow-md"
-              : "border border-gray-300 hover:border-gray-400"
-            } ${sel.status === "saved"
-              ? "bg-green-50"
-              : "bg-gray-50"
-            }`}
-        >
-          <div className="text-sm mb-1">
-            <span className="font-semibold text-gray-700">Page:</span>{" "}
-            <span className="text-gray-900">{sel.pageNo}</span>
-          </div>
-          <div className="text-sm mb-1">
-            <span className="font-semibold text-gray-700">Type:</span>{" "}
-            <span className="text-gray-900">{sel.type}</span>
-          </div>
-          <div className="text-sm mb-2">
-            <span className="font-semibold text-gray-700">Status:</span>{" "}
-            <span className={`font-medium ${sel.status === "saved" ? "text-green-700" : "text-gray-900"
-              }`}>
-              {sel.status}
-            </span>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteSpecificSelection(sel.id);
-            }}
-            className="w-full px-3 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-          >
-            Delete
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+	const API_BASE = "http://localhost:8000";
+
+	useEffect(() => {
+		let isMounted = true;
+		const loadImageTypes = async () => {
+			try {
+				const resp = await fetch(`${API_BASE}/api/image-types/`);
+				if (!resp.ok) return;
+				const data = await resp.json();
+				if (isMounted) setImageTypes(Array.isArray(data) ? data : []);
+			} catch {
+				// ignore
+			}
+		};
+		loadImageTypes();
+		return () => {
+			isMounted = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!activeId) return;
+		const el = itemRefs.current?.[activeId];
+		if (!el) return;
+		el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+	}, [activeId, selections.length]);
+
+	return (
+		<div
+			className={`w-fit shrink-0 border-l border-gray-300 p-4 overflow-y-auto bg-white ${
+				disabled ? "opacity-70" : ""
+			}`}>
+			<div className="relative mb-4">
+				<h3 className="text-lg font-bold text-gray-800">Selections</h3>
+				<span className="absolute top-0 right-0 text-xs font-semibold bg-gray-200 text-gray-800 px-2 py-0.5 rounded-full">
+					{selections.length}
+				</span>
+			</div>
+
+			{!selections.length && (
+				<p className="text-gray-500 text-sm">No selections yet</p>
+			)}
+
+			{selections.map((sel, idx) => {
+				const isActive = sel.id === activeId;
+				return (
+					<div
+						key={sel.id}
+						ref={(el) => {
+							if (el) itemRefs.current[sel.id] = el;
+						}}
+						onClick={() => {
+							if (disabled) return;
+							onSelect(sel.id);
+						}}
+						className={`relative p-3 mb-2 rounded-lg cursor-pointer transition-all ${
+							isActive
+								? "border-2 border-blue-600 shadow-md"
+								: "border border-gray-300 hover:border-gray-400"
+						} ${
+							sel.status === "saved"
+								? "bg-green-50"
+								: "bg-gray-50"
+						}`}>
+
+						<span className="absolute top-2 right-2 text-xs font-semibold bg-gray-200 text-gray-800 px-2 py-0.5 rounded-full">
+							{idx + 1}
+						</span>
+						<div className="text-sm mb-1">
+							<span className="font-semibold text-gray-700">
+								Page:
+							</span>{" "}
+							<span className="text-gray-900">{sel.pageNo}</span>
+						</div>
+						<div className="text-sm mb-1">
+							<span className="font-semibold text-gray-700">
+								Class:
+							</span>{" "}
+							<span className="text-gray-900">
+								{sel.className || sel.classId || "-"}
+							</span>
+						</div>
+						<div className="text-sm mb-1">
+							<span className="font-semibold text-gray-700">
+								Subject:
+							</span>{" "}
+							<span className="text-gray-900">
+								{sel.subjectName || sel.subjectId || "-"}
+							</span>
+						</div>
+						<div className="text-sm mb-1">
+							<span className="font-semibold text-gray-700">
+								Chapter:
+							</span>{" "}
+							<span className="text-gray-900">
+								{sel.chapterName || sel.chapterId || "-"}
+							</span>
+						</div>
+						<div className="text-sm mb-1">
+							<span className="font-semibold text-gray-700">
+								Image Type:
+							</span>{" "}
+							{isActive ? (
+								<select
+									value={sel.imageTypeId || ""}
+									onChange={(e) => {
+										if (disabled) return;
+										const nextId = e.target.value || null;
+										const found = (imageTypes || []).find(
+											(t) =>
+												String(t.id) === String(nextId)
+										);
+										onUpdateSelection?.({
+											...sel,
+											imageTypeId: nextId,
+											imageTypeName: found?.name || "",
+										});
+									}}
+									disabled={disabled}
+									className="px-2 py-1 bg-white border border-gray-300 rounded text-sm">
+									{(imageTypes || []).map((t) => (
+										<option key={t.id} value={String(t.id)}>
+											{t.name}
+										</option>
+									))}
+								</select>
+							) : (
+								<span className="text-gray-900">
+									{sel.imageTypeName ||
+										sel.imageTypeId ||
+										"-"}
+								</span>
+							)}
+						</div>
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+								if (disabled) return;
+                  deleteSpecificSelection(sel.id);
+                }}
+						disabled={disabled}
+                className="p-1 rounded hover:bg-red-50 text-red-600"
+                aria-label="Delete selection"
+                title="Delete">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                </svg>
+              </button>
+            </div>
+					</div>
+				);
+			})}
+		</div>
+	);
 }
