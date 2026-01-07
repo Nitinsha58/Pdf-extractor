@@ -2,8 +2,14 @@ import { useEffect, useState } from "react";
 import { API_BASE, buildMediaUrl } from "./utils";
 import ToggleGroup from "./ToggleGroup";
 
-export default function CroppedImageCard({ item, options, onSaved }) {
+export default function CroppedImageCard({
+	item,
+	options,
+	onSaved,
+	onDeleted,
+}) {
 	const [saving, setSaving] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 	const [error, setError] = useState("");
 
 	const [form, setForm] = useState(() => {
@@ -117,24 +123,70 @@ export default function CroppedImageCard({ item, options, onSaved }) {
 		}
 	};
 
+	const handleDelete = async () => {
+		if (deleting) return;
+		setDeleting(true);
+		setError("");
+		try {
+			const resp = await fetch(
+				`${API_BASE}/api/cropped-images/${item.id}/`,
+				{
+					method: "DELETE",
+				}
+			);
+			if (!resp.ok) {
+				const text = await resp.text();
+				throw new Error(text || `HTTP ${resp.status}`);
+			}
+			onDeleted?.(item.id);
+		} catch (e) {
+			setError(e?.message || "Failed to delete");
+		} finally {
+			setDeleting(false);
+		}
+	};
+
 	return (
 		<div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-			<div className="bg-gray-50 flex items-center justify-center overflow-hidden">
+			<div className="relative group bg-gray-50 flex items-center justify-center overflow-hidden p-2">
 				{imageUrl ? (
 					<img
 						src={imageUrl}
 						alt={`Crop ${item.id}`}
-						className="w-full h-full object-contain"
+						className="w-full max-h-72 object-contain"
 						loading="lazy"
 					/>
 				) : (
 					<div className="text-sm text-gray-500">No image</div>
 				)}
+
+				<button
+					type="button"
+					onClick={handleDelete}
+					disabled={deleting}
+					aria-label={`Delete image ${item.id}`}
+					className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-gray-200 rounded px-2 py-2 text-gray-700 hover:text-red-700 disabled:opacity-60">
+					<svg
+						viewBox="0 0 24 24"
+						width="16"
+						height="16"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round">
+						<path d="M3 6h18" />
+						<path d="M8 6V4h8v2" />
+						<path d="M6 6l1 16h10l1-16" />
+						<path d="M10 11v6" />
+						<path d="M14 11v6" />
+					</svg>
+				</button>
 			</div>
 
-			<div className="p-4 space-y-3">
-				<div className="flex items-center justify-between">
-					<div className="text-sm font-semibold text-gray-800">
+			<div className="p-3 space-y-2">
+				<div className="flex items-center justify-between gap-3">
+					<div className="text-xs font-semibold text-gray-800">
 						ID: {item.id}
 					</div>
 					<button
@@ -152,7 +204,7 @@ export default function CroppedImageCard({ item, options, onSaved }) {
 					</div>
 				) : null}
 
-				<div className="grid grid-cols-2 gap-3">
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 					<ToggleGroup
 						label="Image Type"
 						value={String(form.image_type)}
@@ -193,6 +245,19 @@ export default function CroppedImageCard({ item, options, onSaved }) {
 						}
 					/>
 
+					<ToggleGroup
+						label="Source"
+						value={String(form.source)}
+						clearLabel="—"
+						options={options.sources.map((t) => ({
+							value: t.id,
+							label: t.name,
+						}))}
+						onChange={(v) => setForm((p) => ({ ...p, source: v }))}
+					/>
+				</div>
+
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 					<div>
 						<label className="block text-xs font-medium text-gray-600 mb-1">
 							Marks
@@ -210,9 +275,7 @@ export default function CroppedImageCard({ item, options, onSaved }) {
 							min={0}
 						/>
 					</div>
-				</div>
 
-				<div className="grid grid-cols-2 gap-3">
 					<div>
 						<label className="block text-xs font-medium text-gray-600 mb-1">
 							Class
@@ -278,7 +341,9 @@ export default function CroppedImageCard({ item, options, onSaved }) {
 							))}
 						</select>
 					</div>
+				</div>
 
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 					<div>
 						<label className="block text-xs font-medium text-gray-600 mb-1">
 							Concept
@@ -323,85 +388,79 @@ export default function CroppedImageCard({ item, options, onSaved }) {
 						</select>
 					</div>
 
-					<ToggleGroup
-						label="Source"
-						value={String(form.source)}
-						clearLabel="—"
-						options={options.sources.map((t) => ({
-							value: t.id,
-							label: t.name,
-						}))}
-						onChange={(v) => setForm((p) => ({ ...p, source: v }))}
-					/>
+					<div className="hidden md:block" />
+					<div className="hidden md:block" />
 				</div>
 
-				<div>
-					<div className="text-xs font-medium text-gray-600 mb-2">
-						Usage
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-start">
+					<div className="md:col-span-2">
+						<div className="text-xs font-medium text-gray-600 mb-2">
+							Usage
+						</div>
+						<div className="flex flex-wrap gap-2">
+							{options.usageTypes.map((u) => {
+								const checked = form.usage_types.includes(u.id);
+								return (
+									<button
+										key={u.id}
+										type="button"
+										onClick={() => toggleUsageType(u.id)}
+										className={`px-2 py-1 rounded border text-xs ${
+											checked
+												? "bg-gray-900 text-white border-gray-900"
+												: "bg-white text-gray-800 border-gray-200"
+										}`}>
+										{u.name}
+									</button>
+								);
+							})}
+						</div>
 					</div>
-					<div className="flex flex-wrap gap-2">
-						{options.usageTypes.map((u) => {
-							const checked = form.usage_types.includes(u.id);
-							return (
-								<button
-									key={u.id}
-									type="button"
-									onClick={() => toggleUsageType(u.id)}
-									className={`px-3 py-1 rounded border text-sm ${
-										checked
-											? "bg-gray-900 text-white border-gray-900"
-											: "bg-white text-gray-800 border-gray-200"
-									}`}>
-									{u.name}
-								</button>
-							);
-						})}
-					</div>
-				</div>
 
-				<div className="flex items-center gap-4">
-					<label className="flex items-center gap-2 text-sm text-gray-700">
-						<input
-							type="checkbox"
-							checked={form.verified}
-							onChange={(e) =>
-								setForm((p) => ({
-									...p,
-									verified: e.target.checked,
-								}))
-							}
-						/>
-						Verified
-					</label>
-					<label className="flex items-center gap-2 text-sm text-gray-700">
-						<input
-							type="checkbox"
-							checked={form.is_active}
-							onChange={(e) =>
-								setForm((p) => ({
-									...p,
-									is_active: e.target.checked,
-								}))
-							}
-						/>
-						Active
-					</label>
-					<div className="flex items-center gap-2">
-						<label className="text-xs font-medium text-gray-600">
-							Priority
+					<div className="md:col-span-2 grid grid-cols-2 gap-3 md:pt-5">
+						<label className="flex items-center gap-2 text-sm text-gray-700">
+							<input
+								type="checkbox"
+								checked={form.verified}
+								onChange={(e) =>
+									setForm((p) => ({
+										...p,
+										verified: e.target.checked,
+									}))
+								}
+							/>
+							Verified
 						</label>
-						<input
-							type="number"
-							value={form.priority}
-							onChange={(e) =>
-								setForm((p) => ({
-									...p,
-									priority: e.target.value,
-								}))
-							}
-							className="w-24 border border-gray-200 rounded px-2 py-1 text-sm"
-							min={0}
-						/>
+						<label className="flex items-center gap-2 text-sm text-gray-700">
+							<input
+								type="checkbox"
+								checked={form.is_active}
+								onChange={(e) =>
+									setForm((p) => ({
+										...p,
+										is_active: e.target.checked,
+									}))
+								}
+							/>
+							Active
+						</label>
+						<div className="col-span-2 flex items-center gap-2">
+							<label className="text-xs font-medium text-gray-600">
+								Priority
+							</label>
+							<input
+								type="number"
+								value={form.priority}
+								onChange={(e) =>
+									setForm((p) => ({
+										...p,
+										priority: e.target.value,
+									}))
+								}
+								className="w-24 border border-gray-200 rounded px-2 py-1 text-sm"
+								min={0}
+							/>
+						</div>
 					</div>
 				</div>
 			</div>

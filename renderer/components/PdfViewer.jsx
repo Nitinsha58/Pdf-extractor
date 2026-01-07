@@ -182,16 +182,35 @@ export default function PdfViewer({
 				}
 
 				const { x, y, w, h } = sel.rectScreen;
+				const pageBounds = pageCanvas.getBoundingClientRect();
+				// Convert CSS-pixel selection rect -> canvas backing-store pixels
+				const scaleX =
+					pageBounds.width > 0
+						? pageCanvas.width / pageBounds.width
+						: 1;
+				const scaleY =
+					pageBounds.height > 0
+						? pageCanvas.height / pageBounds.height
+						: 1;
+				const sx = Math.max(0, Math.round(x * scaleX));
+				const sy = Math.max(0, Math.round(y * scaleY));
+				const sw = Math.max(1, Math.round(w * scaleX));
+				const sh = Math.max(1, Math.round(h * scaleY));
 				const off = document.createElement("canvas");
-				off.width = Math.max(1, Math.round(w));
-				off.height = Math.max(1, Math.round(h));
+				off.width = sw;
+				off.height = sh;
 				const octx = off.getContext("2d");
+				if (!octx) {
+					throw new Error(
+						`Failed to create 2D context for selection ${sel.id}`
+					);
+				}
 				octx.drawImage(
 					pageCanvas,
-					x,
-					y,
-					w,
-					h,
+					sx,
+					sy,
+					sw,
+					sh,
 					0,
 					0,
 					off.width,
@@ -268,9 +287,19 @@ export default function PdfViewer({
 		const page = await pdf.ref.getPage(pageNo);
 		const viewport = page.getViewport({ scale: zoom });
 		const ctx = canvas.getContext("2d");
-		canvas.width = viewport.width;
-		canvas.height = viewport.height;
-		await page.render({ canvasContext: ctx, viewport }).promise;
+		if (!ctx) return;
+
+		// Render at devicePixelRatio for sharper output on HiDPI/retina screens.
+		const outputScale = Math.max(1, Number(window.devicePixelRatio || 1));
+		canvas.width = Math.max(1, Math.floor(viewport.width * outputScale));
+		canvas.height = Math.max(1, Math.floor(viewport.height * outputScale));
+		canvas.style.width = `${viewport.width}px`;
+		canvas.style.height = `${viewport.height}px`;
+
+		const transform =
+			outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
+		await page.render({ canvasContext: ctx, viewport, transform }).promise;
 		viewportByPageRef.current[pageNo] = viewport;
 		onPageRender?.({ page, viewport, canvas });
 	};

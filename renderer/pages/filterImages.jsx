@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { API_BASE, buildMediaUrl } from "./filterUpdate/utils";
 import ToggleGroup from "./filterUpdate/ToggleGroup";
 import TopNav from "../components/TopNav";
+import SearchableSelect from "../components/SearchableSelect";
 
 export default function FilterImagesPage() {
 	const [loading, setLoading] = useState(false);
@@ -42,6 +43,64 @@ export default function FilterImagesPage() {
 		() => options.usageTypes.map((u) => ({ value: u.id, label: u.name })),
 		[options.usageTypes]
 	);
+
+	const filteredChapters = useMemo(() => {
+		const classId = filters.class_name ? Number(filters.class_name) : null;
+		const subjectId = filters.subject ? Number(filters.subject) : null;
+		return options.chapters
+			.filter((c) => {
+				if (classId && c.class_name_id !== classId) return false;
+				if (subjectId && c.subject_id !== subjectId) return false;
+				return true;
+			})
+			.map((c) => ({ value: c.id, label: c.name }));
+	}, [options.chapters, filters.class_name, filters.subject]);
+
+	const filteredConcepts = useMemo(() => {
+		const classId = filters.class_name ? Number(filters.class_name) : null;
+		const subjectId = filters.subject ? Number(filters.subject) : null;
+		const chapterId = filters.chapter ? Number(filters.chapter) : null;
+		return options.concepts
+			.filter((c) => {
+				if (chapterId && c.chapter_id !== chapterId) return false;
+				if (!chapterId) {
+					if (classId && c.class_name_id !== classId) return false;
+					if (subjectId && c.subject_id !== subjectId) return false;
+				}
+				return true;
+			})
+			.map((c) => ({ value: c.id, label: c.name }));
+	}, [
+		options.concepts,
+		filters.class_name,
+		filters.subject,
+		filters.chapter,
+	]);
+
+	const filteredTopics = useMemo(() => {
+		const classId = filters.class_name ? Number(filters.class_name) : null;
+		const subjectId = filters.subject ? Number(filters.subject) : null;
+		const chapterId = filters.chapter ? Number(filters.chapter) : null;
+		const conceptId = filters.concept ? Number(filters.concept) : null;
+		return options.topics
+			.filter((t) => {
+				if (conceptId && t.concept_id !== conceptId) return false;
+				if (!conceptId && chapterId && t.chapter_id !== chapterId)
+					return false;
+				if (!conceptId && !chapterId) {
+					if (classId && t.class_name_id !== classId) return false;
+					if (subjectId && t.subject_id !== subjectId) return false;
+				}
+				return true;
+			})
+			.map((t) => ({ value: t.id, label: t.name }));
+	}, [
+		options.topics,
+		filters.class_name,
+		filters.subject,
+		filters.chapter,
+		filters.concept,
+	]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -213,6 +272,97 @@ export default function FilterImagesPage() {
 					</div>
 
 					<div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+						<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+							<div>
+								<label className="block text-xs font-medium text-gray-600 mb-1">
+									Class
+								</label>
+								<select
+									value={filters.class_name}
+									onChange={(e) =>
+										setFilters((p) => ({
+											...p,
+											class_name: e.target.value,
+											chapter: "",
+											concept: "",
+											topic: "",
+										}))
+									}
+									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
+									<option value="">All</option>
+									{options.classes.map((t) => (
+										<option key={t.id} value={t.id}>
+											{t.name}
+										</option>
+									))}
+								</select>
+							</div>
+
+							<div>
+								<label className="block text-xs font-medium text-gray-600 mb-1">
+									Subject
+								</label>
+								<select
+									value={filters.subject}
+									onChange={(e) =>
+										setFilters((p) => ({
+											...p,
+											subject: e.target.value,
+											chapter: "",
+											concept: "",
+											topic: "",
+										}))
+									}
+									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
+									<option value="">All</option>
+									{options.subjects.map((t) => (
+										<option key={t.id} value={t.id}>
+											{t.name}
+										</option>
+									))}
+								</select>
+							</div>
+
+							<SearchableSelect
+								label="Chapter"
+								value={filters.chapter}
+								options={filteredChapters}
+								onChange={(v) =>
+									setFilters((p) => ({
+										...p,
+										chapter: v,
+										concept: "",
+										topic: "",
+									}))
+								}
+								placeholder="Search chapter…"
+							/>
+
+							<SearchableSelect
+								label="Concept"
+								value={filters.concept}
+								options={filteredConcepts}
+								onChange={(v) =>
+									setFilters((p) => ({
+										...p,
+										concept: v,
+										topic: "",
+									}))
+								}
+								placeholder="Search concept…"
+							/>
+
+							<SearchableSelect
+								label="Topic"
+								value={filters.topic}
+								options={filteredTopics}
+								onChange={(v) =>
+									setFilters((p) => ({ ...p, topic: v }))
+								}
+								placeholder="Search topic…"
+							/>
+						</div>
+
 						<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
 							<ToggleGroup
 								label="Type"
@@ -243,49 +393,6 @@ export default function FilterImagesPage() {
 									setFilters((p) => ({ ...p, difficulty: v }))
 								}
 							/>
-
-							<div>
-								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Marks
-								</label>
-								<input
-									type="number"
-									value={filters.marks}
-									onChange={(e) =>
-										setFilters((p) => ({
-											...p,
-											marks: e.target.value,
-										}))
-									}
-									className="w-full border border-gray-200 rounded px-2 py-1 text-sm"
-									min={0}
-								/>
-							</div>
-
-							<div>
-								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Usage
-								</label>
-								<div className="flex flex-wrap gap-2">
-									{usageTypeOptions.map((opt) => (
-										<button
-											key={opt.value}
-											type="button"
-											onClick={() =>
-												toggleFilterUsageType(opt.value)
-											}
-											className={`px-3 py-1 rounded border text-sm ${
-												filters.usage_types.includes(
-													opt.value
-												)
-													? "bg-gray-900 text-white border-gray-900"
-													: "bg-white text-gray-800 border-gray-200"
-											}`}>
-											{opt.label}
-										</button>
-									))}
-								</div>
-							</div>
 
 							<ToggleGroup
 								label="Source"
@@ -325,6 +432,30 @@ export default function FilterImagesPage() {
 									setFilters((p) => ({ ...p, verified: v }))
 								}
 							/>
+							<div>
+								<label className="block text-xs font-medium text-gray-600 mb-1">
+									Usage
+								</label>
+								<div className="flex flex-wrap gap-2">
+									{usageTypeOptions.map((opt) => (
+										<button
+											key={opt.value}
+											type="button"
+											onClick={() =>
+												toggleFilterUsageType(opt.value)
+											}
+											className={`px-3 py-1 rounded border text-sm ${
+												filters.usage_types.includes(
+													opt.value
+												)
+													? "bg-gray-900 text-white border-gray-900"
+													: "bg-white text-gray-800 border-gray-200"
+											}`}>
+											{opt.label}
+										</button>
+									))}
+								</div>
+							</div>
 
 							<div>
 								<label className="block text-xs font-medium text-gray-600 mb-1">
@@ -343,117 +474,23 @@ export default function FilterImagesPage() {
 									min={0}
 								/>
 							</div>
-						</div>
-
-						<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-							<div>
-								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Class
-								</label>
-								<select
-									value={filters.class_name}
-									onChange={(e) =>
-										setFilters((p) => ({
-											...p,
-											class_name: e.target.value,
-										}))
-									}
-									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
-									<option value="">All</option>
-									{options.classes.map((t) => (
-										<option key={t.id} value={t.id}>
-											{t.name}
-										</option>
-									))}
-								</select>
-							</div>
 
 							<div>
 								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Subject
+									Marks
 								</label>
-								<select
-									value={filters.subject}
+								<input
+									type="number"
+									value={filters.marks}
 									onChange={(e) =>
 										setFilters((p) => ({
 											...p,
-											subject: e.target.value,
+											marks: e.target.value,
 										}))
 									}
-									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
-									<option value="">All</option>
-									{options.subjects.map((t) => (
-										<option key={t.id} value={t.id}>
-											{t.name}
-										</option>
-									))}
-								</select>
-							</div>
-
-							<div>
-								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Chapter
-								</label>
-								<select
-									value={filters.chapter}
-									onChange={(e) =>
-										setFilters((p) => ({
-											...p,
-											chapter: e.target.value,
-										}))
-									}
-									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
-									<option value="">All</option>
-									{options.chapters.map((t) => (
-										<option key={t.id} value={t.id}>
-											{t.name}
-										</option>
-									))}
-								</select>
-							</div>
-
-							<div>
-								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Concept
-								</label>
-								<select
-									value={filters.concept}
-									onChange={(e) =>
-										setFilters((p) => ({
-											...p,
-											concept: e.target.value,
-										}))
-									}
-									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
-									<option value="">All</option>
-									{options.concepts.map((t) => (
-										<option key={t.id} value={t.id}>
-											{t.name}
-										</option>
-									))}
-								</select>
-							</div>
-
-							<div>
-								<label className="block text-xs font-medium text-gray-600 mb-1">
-									Topic
-								</label>
-								<select
-									value={filters.topic}
-									onChange={(e) =>
-										setFilters((p) => ({
-											...p,
-											topic: e.target.value,
-										}))
-									}
-									className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
-									<option value="">All</option>
-									{options.topics.map((t) => (
-										<option key={t.id} value={t.id}>
-											{t.name}
-										</option>
-									))}
-								</select>
+									className="w-full border border-gray-200 rounded px-2 py-1 text-sm"
+									min={0}
+								/>
 							</div>
 						</div>
 					</div>
