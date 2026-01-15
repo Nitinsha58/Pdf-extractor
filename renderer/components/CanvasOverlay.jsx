@@ -24,9 +24,9 @@ export default function CanvasOverlay({
 								height: s.rectScreen.h,
 								border:
 									s.id === activeSelection?.id
-										? "3px solid #007bff"
-										: "2px dashed #00aaff",
-								background: "rgba(0,150,255,0.08)",
+										? "2px solid #007bff"
+										: "1px dashed #00aaff",
+								background: "rgba(0,150,255,0.04)",
 							}}>
 							<div className="relative w-full h-full">
 								<div className="absolute top-1 right-1 text-[10px] font-semibold bg-white/90 text-blue-700 border border-blue-600 rounded px-1.5 py-0.5 pointer-events-none select-none">
@@ -74,7 +74,7 @@ export default function CanvasOverlay({
 
 			{rect && (
 				<div
-					className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none"
+					className="absolute border border-dashed border-blue-500 bg-blue-500/5 pointer-events-none"
 					style={{
 						left: rect.x,
 						top: rect.y,
