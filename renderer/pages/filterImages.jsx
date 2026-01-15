@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE, buildMediaUrl } from "./filterUpdate/utils";
 import ToggleGroup from "./filterUpdate/ToggleGroup";
 import TopNav from "../components/TopNav";
@@ -9,6 +9,7 @@ export default function FilterImagesPage() {
 	const [error, setError] = useState("");
 	const [items, setItems] = useState([]);
 	const [meta, setMeta] = useState({ page: 1, page_size: 60, count: 0 });
+	const abortRef = useRef(null);
 
 	const [options, setOptions] = useState({
 		classes: [],
@@ -175,68 +176,88 @@ export default function FilterImagesPage() {
 		};
 	}, []);
 
-	const buildQuery = (page, f = filters) => {
-		const params = new URLSearchParams();
-		params.set("page", String(page));
-		params.set("page_size", String(meta.page_size));
+	const buildQuery = useCallback(
+		(page, f = filters) => {
+			const params = new URLSearchParams();
+			params.set("page", String(page));
+			params.set("page_size", String(meta.page_size));
 
-		const entries = {
-			image_type: f.image_type,
-			question_type: f.question_type,
-			difficulty: f.difficulty,
-			marks: f.marks,
-			source: f.source,
-			is_active: f.is_active,
-			verified: f.verified,
-			priority: f.priority,
-			class_name: f.class_name,
-			subject: f.subject,
-			chapter: f.chapter,
-			concept: f.concept,
-			topic: f.topic,
-		};
+			const entries = {
+				image_type: f.image_type,
+				question_type: f.question_type,
+				difficulty: f.difficulty,
+				marks: f.marks,
+				source: f.source,
+				is_active: f.is_active,
+				verified: f.verified,
+				priority: f.priority,
+				class_name: f.class_name,
+				subject: f.subject,
+				chapter: f.chapter,
+				concept: f.concept,
+				topic: f.topic,
+			};
 
-		Object.entries(entries).forEach(([k, v]) => {
-			if (v !== "" && v !== null && v !== undefined)
-				params.set(k, String(v));
-		});
-
-		if (f.usage_types.length) {
-			params.set("usage_types", f.usage_types.join(","));
-		}
-
-		return params.toString();
-	};
-
-	const load = async (page = 1, f = filters) => {
-		setLoading(true);
-		setError("");
-		try {
-			const resp = await fetch(
-				`${API_BASE}/api/cropped-images/?${buildQuery(page, f)}`
-			);
-			if (!resp.ok) {
-				const text = await resp.text();
-				throw new Error(text || `HTTP ${resp.status}`);
-			}
-			const data = await resp.json();
-			setItems(Array.isArray(data.results) ? data.results : []);
-			setMeta({
-				page: data.page || page,
-				page_size: data.page_size || meta.page_size,
-				count: data.count || 0,
+			Object.entries(entries).forEach(([k, v]) => {
+				if (v !== "" && v !== null && v !== undefined)
+					params.set(k, String(v));
 			});
-		} catch (e) {
-			setError(e?.message || "Failed to load images");
-		} finally {
-			setLoading(false);
-		}
-	};
+
+			if (f.usage_types.length) {
+				params.set("usage_types", f.usage_types.join(","));
+			}
+
+			return params.toString();
+		},
+		[filters, meta.page_size]
+	);
+
+	const load = useCallback(
+		async (page = 1, f = filters) => {
+			setLoading(true);
+			setError("");
+			try {
+				if (abortRef.current) abortRef.current.abort();
+				const controller = new AbortController();
+				abortRef.current = controller;
+
+				const resp = await fetch(
+					`${API_BASE}/api/cropped-images/?${buildQuery(page, f)}`,
+					{ signal: controller.signal }
+				);
+				if (!resp.ok) {
+					const text = await resp.text();
+					throw new Error(text || `HTTP ${resp.status}`);
+				}
+				const data = await resp.json();
+				setItems(Array.isArray(data.results) ? data.results : []);
+				setMeta({
+					page: data.page || page,
+					page_size: data.page_size || meta.page_size,
+					count: data.count || 0,
+				});
+			} catch (e) {
+				if (e?.name === "AbortError") return;
+				setError(e?.message || "Failed to load images");
+			} finally {
+				setLoading(false);
+			}
+		},
+		[buildQuery, filters, meta.page_size]
+	);
 
 	useEffect(() => {
-		load(1, filters);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		return () => {
+			if (abortRef.current) abortRef.current.abort();
+		};
 	}, []);
+
+	useEffect(() => {
+		const t = setTimeout(() => {
+			load(1, filters);
+		}, 250);
+		return () => clearTimeout(t);
+	}, [filters, load]);
 
 	const toggleFilterUsageType = (id) => {
 		setFilters((prev) => {
@@ -254,6 +275,49 @@ export default function FilterImagesPage() {
 		1,
 		Math.ceil((meta.count || 0) / meta.page_size)
 	);
+
+	const groupedItems = useMemo(() => {
+		const baseIndex = (Math.max(1, meta.page) - 1) * (meta.page_size || 0);
+		return (Array.isArray(items) ? items : []).map((it, idx) => {
+			const groupNumber = baseIndex + idx + 1;
+			const primaryUrl = buildMediaUrl(it?.cropped_image || it?.image);
+
+			const extras = Array.isArray(it?.extra_images)
+				? [...it.extra_images]
+				: [];
+
+			extras.sort((a, b) => {
+				const ao = Number.isFinite(a?.sort_order) ? a.sort_order : 0;
+				const bo = Number.isFinite(b?.sort_order) ? b.sort_order : 0;
+				if (ao !== bo) return ao - bo;
+				return (a?.id || 0) - (b?.id || 0);
+			});
+
+			const images = [];
+			if (primaryUrl) {
+				images.push({
+					key: `primary-${it?.id ?? idx}`,
+					url: primaryUrl,
+					label: String(groupNumber),
+				});
+			}
+			extras.forEach((ex, exIdx) => {
+				const url = buildMediaUrl(ex?.image);
+				if (!url) return;
+				images.push({
+					key: `extra-${it?.id ?? idx}-${ex?.id ?? exIdx}`,
+					url,
+					label: `${groupNumber}.${exIdx + 1}`,
+				});
+			});
+
+			return {
+				groupKey: String(it?.id ?? groupNumber),
+				groupNumber,
+				images,
+			};
+		});
+	}, [items, meta.page, meta.page_size]);
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -531,23 +595,33 @@ export default function FilterImagesPage() {
 						</div>
 					</div>
 
-					<div className="flex flex-col w-full gap-3">
-						{items
-							.map((it) => ({
-								id: it.id,
-								url: buildMediaUrl(
-									it.cropped_image || it.image
-								),
-							}))
-							.filter((x) => Boolean(x.url))
-							.map((x) => (
-								<img
-									key={x.id}
-									src={x.url}
-									alt={`Image ${x.id}`}
-									className="w-full h-auto object-contain"
-									loading="lazy"
-								/>
+					<div className="flex flex-col w-full gap-4">
+						{groupedItems
+							.filter((g) => g.images.length > 0)
+							.map((g) => (
+								<div
+									key={g.groupKey}
+									className="border-2 border-dashed border-gray-300 bg-white p-2">
+									<div className="flex flex-col gap-3">
+										{g.images.map((img) => (
+											<div
+												key={img.key}
+												className="relative w-full border border-gray-200 bg-white overflow-hidden">
+												<div className="absolute top-2 right-2 z-10">
+													<div className="px-2 py-1 text-xs font-semibold rounded bg-gray-900 text-white shadow">
+														{img.label}
+													</div>
+												</div>
+												<img
+													src={img.url}
+													alt={`Image ${img.label}`}
+													className="block w-full h-auto object-contain"
+													loading="lazy"
+												/>
+											</div>
+										))}
+									</div>
+								</div>
 							))}
 					</div>
 				</div>

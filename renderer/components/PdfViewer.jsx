@@ -24,6 +24,9 @@ export default function PdfViewer({
 	const [numPages, setNumPages] = useState(0);
 	const [zoom, setZoom] = useState(1.5);
 	const [mode, setMode] = useState("draw");
+	const [sameQuestionMode, setSameQuestionMode] = useState(false);
+	const [currentQuestionGroupKey, setCurrentQuestionGroupKey] =
+		useState(null);
 	const [rect, setRect] = useState(null);
 	const [drawingPageNo, setDrawingPageNo] = useState(null);
 	const [classes, setClasses] = useState([]);
@@ -45,6 +48,17 @@ export default function PdfViewer({
 	const MIN_BOX_SIZE_PX = Math.round((96 / 2.54) * 1);
 
 	const API_BASE = "http://localhost:8000";
+
+	const newGroupKey = () => {
+		try {
+			if (typeof crypto !== "undefined" && crypto?.randomUUID) {
+				return crypto.randomUUID();
+			}
+		} catch {
+			// ignore
+		}
+		return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	};
 
 	useEffect(() => {
 		renderAllPages();
@@ -160,6 +174,7 @@ export default function PdfViewer({
 		try {
 			const items = [];
 			const form = new FormData();
+			const groupCounters = {};
 
 			for (let i = 0; i < selections.length; i++) {
 				const sel = selections[i];
@@ -227,7 +242,17 @@ export default function PdfViewer({
 				}
 
 				form.append(`image_${i}`, blob, `crop-${sel.id}.png`);
+				const rawGroupKey =
+					sel.questionGroupKey ||
+					sel.groupKey ||
+					sel.question_group ||
+					null;
+				const groupKey = rawGroupKey || `__single__${i}`;
+				groupCounters[groupKey] = (groupCounters[groupKey] || 0) + 1;
+				const groupIndex = groupCounters[groupKey];
 				items.push({
+					groupKey,
+					groupIndex,
 					rectPdf: sel.rectPdf || {},
 					rectScreen: sel.rectScreen || {},
 					classId: String(classId),
@@ -436,6 +461,14 @@ export default function PdfViewer({
 
 		const newSelection = {
 			id: `${pageNo}-${Date.now()}`,
+			questionGroupKey: (() => {
+				const key =
+					sameQuestionMode && currentQuestionGroupKey
+						? currentQuestionGroupKey
+						: newGroupKey();
+				setCurrentQuestionGroupKey(key);
+				return key;
+			})(),
 			rectScreen: rect,
 			rectPdf: pdfRect,
 			pageNo,
@@ -605,6 +638,8 @@ export default function PdfViewer({
 				pdf={pdf}
 				mode={mode}
 				setMode={setMode}
+				sameQuestionMode={sameQuestionMode}
+				setSameQuestionMode={setSameQuestionMode}
 				onUpload={uploadSelections}
 				isUploading={isUploading}
 				uploadProgress={uploadProgress}

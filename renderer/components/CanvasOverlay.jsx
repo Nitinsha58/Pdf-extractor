@@ -6,13 +6,44 @@ export default function CanvasOverlay({
 	activeSelection,
 	onResizeHandleMouseDown,
 }) {
+	const getGroupKey = (sel, fallback) =>
+		sel?.questionGroupKey ||
+		sel?.groupKey ||
+		sel?.question_group ||
+		sel?.questionGroup ||
+		sel?.id ||
+		`__single__${fallback}`;
+
+	// Build stable labels like: 1, 1.2, 1.3 ... based on group + order of creation.
+	const labelById = (() => {
+		const groupOrder = [];
+		const groupNoByKey = new Map();
+		const nextSubIndexByKey = new Map();
+		const out = {};
+
+		(selections || []).forEach((sel, i) => {
+			const key = String(getGroupKey(sel, i));
+			if (!groupNoByKey.has(key)) {
+				groupOrder.push(key);
+				groupNoByKey.set(key, groupOrder.length); // 1-based
+				nextSubIndexByKey.set(key, 1);
+			}
+			const groupNo = groupNoByKey.get(key);
+			const subIndex = nextSubIndexByKey.get(key) || 1;
+			nextSubIndexByKey.set(key, subIndex + 1);
+			out[sel.id] =
+				subIndex === 1 ? String(groupNo) : `${groupNo}.${subIndex}`;
+		});
+
+		return out;
+	})();
+
 	return (
 		<div ref={overlayRef} className="absolute inset-0 pointer-events-none">
 			{selections
 				.filter((s) => s.pageNo === pageNo)
 				.map((s) => {
-					const boxNo =
-						selections.findIndex((x) => x.id === s.id) + 1;
+					const boxNo = labelById[s.id] || "";
 					return (
 						<div
 							key={s.id}

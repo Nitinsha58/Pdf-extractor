@@ -11,6 +11,37 @@ export default function SelectionList({
 	const itemRefs = useRef({});
 	const [imageTypes, setImageTypes] = useState([]);
 
+	const getGroupKey = (sel, fallback) =>
+		sel?.questionGroupKey ||
+		sel?.groupKey ||
+		sel?.question_group ||
+		sel?.questionGroup ||
+		sel?.id ||
+		`__single__${fallback}`;
+
+	const labelById = (() => {
+		const groupOrder = [];
+		const groupNoByKey = new Map();
+		const nextSubIndexByKey = new Map();
+		const out = {};
+
+		(selections || []).forEach((sel, i) => {
+			const key = String(getGroupKey(sel, i));
+			if (!groupNoByKey.has(key)) {
+				groupOrder.push(key);
+				groupNoByKey.set(key, groupOrder.length);
+				nextSubIndexByKey.set(key, 1);
+			}
+			const groupNo = groupNoByKey.get(key);
+			const subIndex = nextSubIndexByKey.get(key) || 1;
+			nextSubIndexByKey.set(key, subIndex + 1);
+			out[sel.id] =
+				subIndex === 1 ? String(groupNo) : `${groupNo}.${subIndex}`;
+		});
+
+		return out;
+	})();
+
 	const API_BASE = "http://localhost:8000";
 
 	useEffect(() => {
@@ -56,6 +87,7 @@ export default function SelectionList({
 
 			{selections.map((sel, idx) => {
 				const isActive = sel.id === activeId;
+				const label = labelById[sel.id] || String(idx + 1);
 				return (
 					<div
 						key={sel.id}
@@ -75,9 +107,8 @@ export default function SelectionList({
 								? "bg-green-50"
 								: "bg-gray-50"
 						}`}>
-
 						<span className="absolute top-2 right-2 text-xs font-semibold bg-gray-200 text-gray-800 px-2 py-0.5 rounded-full">
-							{idx + 1}
+							{label}
 						</span>
 						<div className="text-sm mb-1">
 							<span className="font-semibold text-gray-700">
@@ -145,34 +176,34 @@ export default function SelectionList({
 								</span>
 							)}
 						</div>
-            <div className="flex justify-end mt-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-								if (disabled) return;
-                  deleteSpecificSelection(sel.id);
-                }}
-						disabled={disabled}
-                className="p-1 rounded hover:bg-red-50 text-red-600"
-                aria-label="Delete selection"
-                title="Delete">
-                <svg
-                  viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4h8v2" />
-                  <path d="M19 6l-1 14H6L5 6" />
-                  <path d="M10 11v6" />
-                  <path d="M14 11v6" />
-                </svg>
-              </button>
-            </div>
+						<div className="flex justify-end mt-2">
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									if (disabled) return;
+									deleteSpecificSelection(sel.id);
+								}}
+								disabled={disabled}
+								className="p-1 rounded hover:bg-red-50 text-red-600"
+								aria-label="Delete selection"
+								title="Delete">
+								<svg
+									viewBox="0 0 24 24"
+									width="20"
+									height="20"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round">
+									<path d="M3 6h18" />
+									<path d="M8 6V4h8v2" />
+									<path d="M19 6l-1 14H6L5 6" />
+									<path d="M10 11v6" />
+									<path d="M14 11v6" />
+								</svg>
+							</button>
+						</div>
 					</div>
 				);
 			})}

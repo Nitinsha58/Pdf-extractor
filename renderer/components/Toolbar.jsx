@@ -5,6 +5,8 @@ export default function Toolbar({
 	pdf,
 	mode,
 	setMode,
+	sameQuestionMode,
+	setSameQuestionMode,
 	onUpload,
 	isUploading,
 	uploadProgress,
@@ -71,7 +73,9 @@ export default function Toolbar({
 							setSelectedChapterId(e.target.value || null)
 						}
 						disabled={
-							isUploading || !selectedClassId || !selectedSubjectId
+							isUploading ||
+							!selectedClassId ||
+							!selectedSubjectId
 						}
 						className="px-3 py-2 bg-white border border-gray-300 rounded disabled:opacity-50">
 						<option value="">Chapter</option>
@@ -94,6 +98,19 @@ export default function Toolbar({
 							</option>
 						))}
 					</select>
+					<label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded select-none">
+						<input
+							type="checkbox"
+							checked={Boolean(sameQuestionMode)}
+							onChange={(e) =>
+								setSameQuestionMode?.(e.target.checked)
+							}
+							disabled={isUploading}
+						/>
+						<span className="text-sm text-gray-800">
+							Same question
+						</span>
+					</label>
 				</div>
 				<div className="h-8 w-px bg-gray-300 mx-2"></div>
 				<button
@@ -118,7 +135,11 @@ export default function Toolbar({
 				</button>
 			</div>
 			<div className="">
-				<Link to="/home" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">← Home</Link>
+				<Link
+					to="/home"
+					className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+					← Home
+				</Link>
 			</div>
 		</div>
 	);

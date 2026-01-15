@@ -7,6 +7,8 @@ export default function CroppedImageCard({
 	options,
 	onSaved,
 	onDeleted,
+	label,
+	extraImages = [],
 }) {
 	const [saving, setSaving] = useState(false);
 	const [deleting, setDeleting] = useState(false);
@@ -58,6 +60,7 @@ export default function CroppedImageCard({
 	}, [item]);
 
 	const imageUrl = buildMediaUrl(item.image);
+	const extras = Array.isArray(extraImages) ? extraImages : [];
 
 	const toggleUsageType = (id) => {
 		setForm((prev) => {
@@ -147,41 +150,79 @@ export default function CroppedImageCard({
 	};
 
 	return (
-		<div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-			<div className="relative group bg-gray-50 flex items-center justify-center overflow-hidden p-2">
-				{imageUrl ? (
-					<img
-						src={imageUrl}
-						alt={`Crop ${item.id}`}
-						className="w-full max-h-72 object-contain"
-						loading="lazy"
-					/>
-				) : (
-					<div className="text-sm text-gray-500">No image</div>
-				)}
+		<div className="bg-white border border-gray-200 overflow-hidden">
+			<div className="group">
+				<div className="flex flex-col divide-y divide-gray-200">
+					<div className="relative bg-white overflow-hidden">
+						{label ? (
+							<div className="absolute top-2 right-2 z-10">
+								<div className="px-2 py-1 text-xs font-semibold rounded bg-gray-900 text-white shadow">
+									{label}
+								</div>
+							</div>
+						) : null}
+						{imageUrl ? (
+							<img
+								src={imageUrl}
+								alt={`Crop ${label ? label : item.id}`}
+								className="block w-full h-auto object-contain"
+								loading="lazy"
+							/>
+						) : (
+							<div className="text-sm text-gray-500 p-3">
+								No image
+							</div>
+						)}
 
-				<button
-					type="button"
-					onClick={handleDelete}
-					disabled={deleting}
-					aria-label={`Delete image ${item.id}`}
-					className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-gray-200 rounded px-2 py-2 text-gray-700 hover:text-red-700 disabled:opacity-60">
-					<svg
-						viewBox="0 0 24 24"
-						width="16"
-						height="16"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round">
-						<path d="M3 6h18" />
-						<path d="M8 6V4h8v2" />
-						<path d="M6 6l1 16h10l1-16" />
-						<path d="M10 11v6" />
-						<path d="M14 11v6" />
-					</svg>
-				</button>
+						<button
+							type="button"
+							onClick={handleDelete}
+							disabled={deleting}
+							aria-label={`Delete image ${item.id}`}
+							className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-gray-200 rounded px-2 py-2 text-gray-700 hover:text-red-700 disabled:opacity-60">
+							<svg
+								viewBox="0 0 24 24"
+								width="16"
+								height="16"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round">
+								<path d="M3 6h18" />
+								<path d="M8 6V4h8v2" />
+								<path d="M6 6l1 16h10l1-16" />
+								<path d="M10 11v6" />
+								<path d="M14 11v6" />
+							</svg>
+						</button>
+					</div>
+
+					{extras.map((ex, exIdx) => {
+						const url = buildMediaUrl(ex?.image);
+						if (!url) return null;
+						const badge = label
+							? `${label}.${exIdx + 1}`
+							: `${item.id}.${exIdx + 1}`;
+						return (
+							<div
+								key={`extra-${item.id}-${ex?.id ?? exIdx}`}
+								className="relative bg-white overflow-hidden">
+								<div className="absolute top-2 right-2 z-10">
+									<div className="px-2 py-1 text-xs font-semibold rounded bg-gray-900 text-white shadow">
+										{badge}
+									</div>
+								</div>
+								<img
+									src={url}
+									alt={`Crop ${badge}`}
+									className="block w-full h-auto object-contain"
+									loading="lazy"
+								/>
+							</div>
+						);
+					})}
+				</div>
 			</div>
 
 			<div className="p-3 space-y-2">
