@@ -144,37 +144,30 @@ export default function SelectionList({
 							<span className="font-semibold text-gray-700">
 								Image Type:
 							</span>{" "}
-							{isActive ? (
-								<select
-									value={sel.imageTypeId || ""}
-									onChange={(e) => {
-										if (disabled) return;
-										const nextId = e.target.value || null;
-										const found = (imageTypes || []).find(
-											(t) =>
-												String(t.id) === String(nextId)
-										);
-										onUpdateSelection?.({
-											...sel,
-											imageTypeId: nextId,
-											imageTypeName: found?.name || "",
-										});
-									}}
-									disabled={disabled}
-									className="px-2 py-1 bg-white border border-gray-300 rounded text-sm">
-									{(imageTypes || []).map((t) => (
-										<option key={t.id} value={String(t.id)}>
-											{t.name}
-										</option>
-									))}
-								</select>
-							) : (
-								<span className="text-gray-900">
-									{sel.imageTypeName ||
-										sel.imageTypeId ||
-										"-"}
-								</span>
-							)}
+							<select
+								onClick={(e) => e.stopPropagation()}
+								onMouseDown={(e) => e.stopPropagation()}
+								value={sel.imageTypeId || ""}
+								onChange={(e) => {
+									if (disabled) return;
+									const nextId = e.target.value || null;
+									const found = (imageTypes || []).find(
+										(t) => String(t.id) === String(nextId)
+									);
+									onUpdateSelection?.({
+										...sel,
+										imageTypeId: nextId,
+										imageTypeName: found?.name || "",
+									});
+								}}
+								disabled={disabled}
+								className="px-2 py-1 bg-white border border-gray-300 rounded text-sm">
+								{(imageTypes || []).map((t) => (
+									<option key={t.id} value={String(t.id)}>
+										{t.name}
+									</option>
+								))}
+							</select>
 						</div>
 						<div className="flex justify-end mt-2">
 							<button

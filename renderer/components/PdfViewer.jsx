@@ -280,9 +280,15 @@ export default function PdfViewer({
 				return;
 			}
 
-			// All succeeded -> refresh page as requested
+			// All succeeded -> clear selections/boxes only (keep PDF + selects)
 			skipBeforeUnloadRef.current = true;
-			window.location.reload();
+			pushToast("Upload complete.");
+			setUploadProgress?.(null);
+			setRect(null);
+			setDrawingPageNo(null);
+			setCurrentQuestionGroupKey(null);
+			updateActiveSelection?.(null);
+			clearAllSelection?.();
 		} catch (err) {
 			console.error("Upload aborted:", err);
 			pushToast(err?.message || "Upload aborted.");

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useState } from "react";
 import Landing from "./pages/landing";
 import QuestionView from "./pages/questionView";
@@ -100,20 +100,41 @@ export default function App() {
 		);
 	};
 
+	function AppShell() {
+		const location = useLocation();
+		const isViewerRoute = (location?.pathname || "") === "/";
+
+		return (
+			<div className="h-screen">
+				<div className={isViewerRoute ? "" : "hidden"}>
+					<ViewerPage />
+				</div>
+				<div className={isViewerRoute ? "hidden" : ""}>
+					<Routes>
+						<Route path="/home" element={<Home />} />
+						<Route path="/landing" element={<Landing />} />
+						<Route path="/view" element={<QuestionView />} />
+						<Route
+							path="/filter-update"
+							element={<FilterUpdate />}
+						/>
+						<Route
+							path="/filter-images"
+							element={<FilterImages />}
+						/>
+						<Route path="/concept" element={<Concept />} />
+						<Route path="/chapter" element={<Chapter />} />
+						<Route path="/classes" element={<Classes />} />
+						<Route path="/subject" element={<Subject />} />
+					</Routes>
+				</div>
+			</div>
+		);
+	}
+
 	return (
 		<BrowserRouter>
-			<Routes>
-				<Route path="/home" element={<Home />} />
-				<Route path="/" element={<ViewerPage />} />
-				<Route path="/landing" element={<Landing />} />
-				<Route path="/view" element={<QuestionView />} />
-				<Route path="/filter-update" element={<FilterUpdate />} />
-				<Route path="/filter-images" element={<FilterImages />} />
-				<Route path="/concept" element={<Concept />} />
-				<Route path="/chapter" element={<Chapter />} />
-				<Route path="/classes" element={<Classes />} />
-				<Route path="/subject" element={<Subject />} />
-			</Routes>
+			<AppShell />
 		</BrowserRouter>
 	);
 }
